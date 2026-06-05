@@ -335,8 +335,13 @@ async function submitWeighIn() {
 
 function renderToday() {
   const container = document.getElementById('today-summary');
-  const totCal = todayDay === null ? 0 : +todayMeals.reduce((s, m) => s + m.calories, 0).toFixed(1);
-  const totPro = todayDay === null ? 0 : +todayMeals.reduce((s, m) => s + m.protein, 0).toFixed(1);
+  if (todayDay === null) {
+    container.innerHTML = '<div class="card"><div class="text-muted" style="text-align:center;padding:20px">Go to Log → New Day to start tracking.</div></div>';
+    return;
+  }
+
+  const totCal = +todayMeals.reduce((s, m) => s + m.calories, 0).toFixed(1);
+  const totPro = +todayMeals.reduce((s, m) => s + m.protein, 0).toFixed(1);
   const past13 = historyDays.slice(-13).reduce((s, d) => s + (d.calories || 0), 0);
   const budget = 33600 - past13;
   const calPct = Math.min((totCal / cfg.calCeil) * 100, 100);
@@ -393,5 +398,4 @@ function renderToday() {
 
   const alerts = [];
   if (totCal >= cfg.calCeil) alerts.push({ type: 'red', msg: '🔴 Calorie ceiling hit (' + cfg.calCeil + ' kcal)' });
-  if (totPro >= cfg.proCeil) alerts.push({ type: 'red', msg: '🔴 Protein ceiling hit (' + cfg.proCeil + 'g)' });
-  if (totPro >= cfg.proFloor && totPro < cfg.proCeil) alerts.push({ type: 
+  if (totPro >= cfg.proCeil) a
