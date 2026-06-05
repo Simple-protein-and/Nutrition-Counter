@@ -335,13 +335,8 @@ async function submitWeighIn() {
 
 function renderToday() {
   const container = document.getElementById('today-summary');
-  if (todayDay === null) {
-    container.innerHTML = '<div class="card"><div class="text-muted" style="text-align:center;padding:20px">Go to Log → New Day to start tracking.</div></div>';
-    return;
-  }
-
-  const totCal = +todayMeals.reduce((s, m) => s + m.calories, 0).toFixed(1);
-  const totPro = +todayMeals.reduce((s, m) => s + m.protein, 0).toFixed(1);
+  const totCal = todayDay === null ? 0 : +todayMeals.reduce((s, m) => s + m.calories, 0).toFixed(1);
+  const totPro = todayDay === null ? 0 : +todayMeals.reduce((s, m) => s + m.protein, 0).toFixed(1);
   const past13 = historyDays.slice(-13).reduce((s, d) => s + (d.calories || 0), 0);
   const budget = 33600 - past13;
   const calPct = Math.min((totCal / cfg.calCeil) * 100, 100);
@@ -398,4 +393,196 @@ function renderToday() {
 
   const alerts = [];
   if (totCal >= cfg.calCeil) alerts.push({ type: 'red', msg: '🔴 Calorie ceiling hit (' + cfg.calCeil + ' kcal)' });
-  if (totPro >= cfg.proCeil) a
+  if (totPro >= cfg.proCeil) alerts.push({ type: 'red', msg: '🔴 Protein ceiling hit (' + cfg.proCeil + 'g)' });
+  if (totPro >= cfg.proFloor && totPro < cfg.proCeil) alerts.push({ type: 'green', msg: '✅ Protein floor met (' + cfg.proFloor + 'g)' });
+  document.getElementById('alerts-container').innerHTML = alerts.map(a => `<div class="alert alert-${a.type}">${a.msg}</div>`).join('');
+}
+
+async function addMeal(name, cal, pro, saveLib) {
+  if (!sb || todayDay === null) { alert('Start a new day first via Log → New Day.'); return; }
+  cal = +parseFloat(cal).toFixed(1);
+  pro = +parseFloat(pro).toFixed(1);
+  const { data, error } = await sb.from('meals_today').insert({ day_id: todayDay, name, calories: cal, protein: pro }).select().single();
+  if (error) { alert('Error: ' + error.message); return; }
+  todayMeals.push(data);
+  if (saveLib) {
+    await sb.from('library').upsert({ name, calories: cal, protein: pro }, { onConflict: 'name' });
+    await loadLibrary();
+  }
+  renderToday();
+}
+
+async function deleteMeal(id) {
+  if (!sb) return;
+  await sb.from('meals_today').delete().eq('id', id);
+  todayMeals = todayMeals.filter(m => m.id !== id);
+  renderToday();
+}
+
+function logManual() {
+  const name = document.getElementById('manual-name').value.trim() || 'Manual entry';
+  const cal = document.getElementById('manual-cal').value;
+  const pro = document.getElementById('manual-pro').value;
+  const save = document.getElementById('manual-save').checked;
+  if (!cal && !pro) { alert('Enter calories or protein.'); return; }
+  addMeal(name, cal || 0, pro || 0, save);
+  document.getElementById('manual-name').value = '';
+  document.getElementById('manual-cal').value = '';
+  document.getElementById('manual-pro').value = '';
+  document.getElementById('manual-save').checked = false;
+}
+
+async function searchUSDA() {
+  const q = document.getElementById('usda-query').value.trim();
+  if (!q) return;
+  document.getElementById('usda-results').innerHTML = '<div class="spinner">Searching…</div>';
+  document.getElementById('usda-confirm-card').classList.add('hidden');
+  try {
+    const res = await fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(q)}&pageSize=8&dataType=SR%20Legacy,Survey%20(FNDDS),Foundation`);
+    const data = await res.json();
+    const foods = data.foods || [];
+    if (foods.length === 0) { document.getElementById('usda-results').innerHTML = '<div class="text-muted">No results found.</div>'; return; }
+    document.getElementById('usda-results').innerHTML = foods.map(f => {
+      const cal = (f.foodNutrients || []).find(n => n.nutrientId === 1008 || n.nutrientName?.includes('Energy'))?.value || 0;
+      const pro = (f.foodNutrients || []).find(n => n.nutrientId === 1003 || n.nutrientName?.includes('Protein'))?.value || 0;
+      return `<div class="search-item" onclick='selectUSDA(${JSON.stringify({ id: f.fdcId, name: f.description, cal, pro, ref: 100 })})'>
+        <div class="search-item-name">${f.description}</div>
+        <div class="search-item-detail">${Math.round(cal)} kcal · ${pro}g protein per 100g</div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('usda-results').innerHTML = '<div class="text-muted">Search failed.</div>';
+  }
+}
+
+function selectUSDA(food) {
+  usdaPending = food;
+  document.getElementById('usda-confirm-card').classList.remove('hidden');
+  document.getElementById('usda-confirm-name').textContent = food.name;
+  document.getElementById('usda-serving').value = 100;
+  document.getElementById('usda-ref').value = 100;
+  document.getElementById('usda-final-cal').value = food.cal.toFixed(1);
+  document.getElementById('usda-final-pro').value = food.pro.toFixed(1);
+}
+
+function recalcUSDA() {
+  if (!usdaPending) return;
+  const serving = parseFloat(document.getElementById('usda-serving').value) || 100;
+  document.getElementById('usda-final-cal').value = (usdaPending.cal * serving / 100).toFixed(1);
+  document.getElementById('usda-final-pro').value = (usdaPending.pro * serving / 100).toFixed(1);
+}
+
+function logUSDA() {
+  if (!usdaPending) return;
+  addMeal(usdaPending.name, document.getElementById('usda-final-cal').value, document.getElementById('usda-final-pro').value, document.getElementById('usda-save').checked);
+  document.getElementById('usda-confirm-card').classList.add('hidden');
+  document.getElementById('usda-results').innerHTML = '';
+  document.getElementById('usda-query').value = '';
+  usdaPending = null;
+}
+
+function renderLibrary() {
+  const el = document.getElementById('library-list');
+  const q = (document.getElementById('library-search')?.value || '').toLowerCase();
+  const filtered = libMeals.filter(m => m.name.toLowerCase().includes(q));
+  if (filtered.length === 0) {
+    el.innerHTML = '<div class="text-muted">' + (libMeals.length === 0 ? 'No saved meals yet.' : 'No matches.') + '</div>';
+    return;
+  }
+  el.innerHTML = filtered.map(m => `
+    <div class="meal-item">
+      <div>
+        <div class="meal-name">${m.name}</div>
+        <div class="meal-macros">${m.calories} kcal · ${m.protein}g protein</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="openLibModal('${m.id}')">Log</button>
+    </div>`).join('');
+}
+
+function openLibModal(id) {
+  libPending = libMeals.find(m => m.id === id);
+  if (!libPending) return;
+  document.getElementById('lib-modal-title').textContent = libPending.name;
+  document.getElementById('lib-modal-macros').textContent = libPending.calories + ' kcal · ' + libPending.protein + 'g protein (100%)';
+  document.getElementById('pct-slider').value = 100;
+  updatePctDisplay();
+  document.getElementById('lib-modal').classList.remove('hidden');
+}
+
+function updatePctDisplay() {
+  if (!libPending) return;
+  const pct = parseInt(document.getElementById('pct-slider').value);
+  document.getElementById('pct-display').textContent = pct + '%';
+  const cal = (libPending.calories * pct / 100).toFixed(1);
+  const pro = (libPending.protein * pct / 100).toFixed(1);
+  document.getElementById('lib-modal-adjusted').textContent = cal + ' kcal · ' + pro + 'g protein';
+}
+
+function closeLibModal() {
+  document.getElementById('lib-modal').classList.add('hidden');
+  libPending = null;
+}
+
+function confirmLibLog() {
+  if (!libPending) return;
+  const pct = parseInt(document.getElementById('pct-slider').value);
+  addMeal(libPending.name, (libPending.calories * pct / 100).toFixed(1), (libPending.protein * pct / 100).toFixed(1), false);
+  closeLibModal();
+}
+
+function switchLogTab(tab, el) {
+  document.querySelectorAll('#screen-log .tab').forEach(t => t.classList.remove('active'));
+  if (el) el.classList.add('active');
+  ['manual','search','library','newday'].forEach(t => document.getElementById('log-'+t).classList.add('hidden'));
+  document.getElementById('log-' + tab).classList.remove('hidden');
+  if (tab === 'library') renderLibrary();
+  if (tab === 'newday') {
+    const maxDay = historyDays.length > 0 ? Math.max(...historyDays.map(d => d.id)) : (todayDay || 0);
+    const nextDay = todayDay !== null ? todayDay + 1 : maxDay + 1;
+    document.getElementById('newday-label').textContent = 'This will be logged as Day ' + nextDay;
+  }
+}
+
+function renderHistory() {
+  const rows = [...historyDays];
+  if (rows.length === 0) {
+    document.getElementById('history-body').innerHTML = '<tr><td colspan="4" class="spinner">No data yet.</td></tr>';
+    return;
+  }
+  const last14 = rows.slice(-14);
+  const avgCal = last14.reduce((s, d) => s + (d.calories || 0), 0) / last14.length;
+  const avgPro = last14.reduce((s, d) => s + (d.protein || 0), 0) / last14.length;
+  const window35 = rows.slice(-35);
+  const firstW = window35[0]?.weight_kg || 0;
+  const lastW = window35[window35.length - 1]?.weight_kg || firstW;
+  const kgLost = Math.max(0, firstW - lastW);
+  const totalCal = window35.reduce((s, d) => s + (d.calories || 0), 0);
+  const days = window35.length;
+  const tdee = days > 0 ? Math.round((totalCal + kgLost * cfg.fatRatio * 7700) / days) : 0;
+  document.getElementById('history-body').innerHTML = rows.map(d => `
+    <tr>
+      <td>Day ${d.id}</td>
+      <td>${d.weight_kg ? d.weight_kg + ' kg' : '—'}</td>
+      <td>${d.calories ?? '—'}</td>
+      <td>${d.protein != null ? d.protein + 'g' : '—'}</td>
+    </tr>`).join('') + `
+    <tr class="summary-row">
+      <td>TDEE: ${tdee} kcal</td>
+      <td>—</td>
+      <td>${Math.round(avgCal)}</td>
+      <td>${Math.round(avgPro)}g</td>
+    </tr>`;
+}
+
+async function init() {
+  await loadSettings();
+  await loadHistory();
+  await detectOpenDay();
+  await loadLibrary();
+  renderToday();
+}
+
+init();
+</script>
+</body>
+</html>
