@@ -20,13 +20,14 @@
   .screen.active { display: block; }
   .card { background: var(--surface); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; border: 1px solid var(--border); }
   .card-title { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
-  input, select { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 16px; padding: 10px 12px; width: 100%; outline: none; font-family: var(--font); }
+  input { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 16px; padding: 10px 12px; width: 100%; outline: none; font-family: var(--font); }
   input:focus { border-color: var(--accent); }
   label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
   .btn { display: block; width: 100%; padding: 13px; border-radius: 8px; border: none; font-size: 16px; font-weight: 600; cursor: pointer; transition: opacity .2s; }
   .btn:active { opacity: .7; }
   .btn-primary { background: var(--accent); color: #fff; }
   .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-danger { background: var(--red); color: #fff; }
   .btn-sm { font-size: 13px; padding: 7px 12px; width: auto; display: inline-block; }
   .alert { border-radius: 8px; padding: 12px; margin-bottom: 10px; font-size: 14px; font-weight: 500; }
   .alert-green { background: #1b3d1e; border: 1px solid var(--green); color: var(--green); }
@@ -73,121 +74,145 @@
   .hidden { display: none !important; }
   .spinner { text-align: center; padding: 20px; color: var(--muted); font-size: 14px; }
   .divider { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+
+  /* AUTH */
+  #auth-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+  .auth-box { background: var(--surface); border-radius: var(--radius); padding: 28px; width: 100%; max-width: 400px; border: 1px solid var(--border); }
+  .auth-title { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  .auth-sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+  .auth-toggle { text-align: center; margin-top: 16px; font-size: 14px; color: var(--muted); }
+  .auth-toggle span { color: var(--accent); cursor: pointer; }
+  .auth-error { color: var(--red); font-size: 13px; margin-top: 8px; min-height: 18px; }
 </style>
 </head>
 <body>
 
-<nav>
-  <button class="active" onclick="showScreen('today',this)">Today</button>
-  <button onclick="showScreen('log',this)">Log</button>
-  <button onclick="showScreen('history',this)">History</button>
-  <button onclick="showScreen('settings',this)">Settings</button>
-</nav>
-
-<!-- TODAY -->
-<div id="screen-today" class="screen active">
-  <div id="alerts-container"></div>
-  <div id="today-summary"></div>
-</div>
-
-<!-- LOG -->
-<div id="screen-log" class="screen">
-  <div class="tab-row">
-    <div class="tab active" onclick="switchLogTab('manual',this)">Manual</div>
-    <div class="tab" onclick="switchLogTab('search',this)">USDA Search</div>
-    <div class="tab" onclick="switchLogTab('library',this)">Library</div>
-    <div class="tab" onclick="switchLogTab('newday',this)" style="color:var(--yellow)">New Day</div>
-  </div>
-
-  <div id="log-manual">
-    <div class="card">
-      <div class="card-title">Manual entry</div>
-      <div class="mb">
-        <label>Meal name (optional)</label>
-        <input type="text" id="manual-name" placeholder="e.g. Hanamaru udon">
-      </div>
-      <div class="row mb">
-        <div><label>Calories (kcal)</label><input type="number" id="manual-cal" step="0.1" placeholder="0"></div>
-        <div><label>Protein (g)</label><input type="number" id="manual-pro" step="0.1" placeholder="0"></div>
-      </div>
-      <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text);margin-bottom:12px">
-        <input type="checkbox" id="manual-save" style="width:auto"> Save to library
-      </label>
-      <button class="btn btn-primary" onclick="logManual()">Add to today</button>
+<!-- AUTH SCREEN -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <div class="auth-title" id="auth-title">Welcome back</div>
+    <div class="auth-sub" id="auth-sub">Sign in to your account</div>
+    <div class="mb">
+      <label>Username</label>
+      <input type="text" id="auth-username" placeholder="your username" autocomplete="username">
     </div>
-  </div>
-
-  <div id="log-search" class="hidden">
-    <div class="card">
-      <div class="card-title">USDA FoodData Central</div>
-      <div class="row mb">
-        <input type="text" id="usda-query" placeholder="Search food..." onkeydown="if(event.key==='Enter')searchUSDA()">
-        <button class="btn btn-primary btn-sm" onclick="searchUSDA()" style="flex:0 0 70px">Go</button>
-      </div>
-      <div id="usda-results"></div>
+    <div class="mb">
+      <label>Password</label>
+      <input type="password" id="auth-password" placeholder="your password" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitAuth()">
     </div>
-    <div class="card hidden" id="usda-confirm-card">
-      <div class="card-title">Confirm & adjust</div>
-      <div id="usda-confirm-name" style="font-weight:600;margin-bottom:10px"></div>
-      <div class="row mb">
-        <div><label>Serving size (g)</label><input type="number" id="usda-serving" step="1" placeholder="100" oninput="recalcUSDA()"></div>
-        <div><label>Reference size (g)</label><input type="number" id="usda-ref" step="1" disabled></div>
-      </div>
-      <div class="row mb">
-        <div><label>Calories</label><input type="number" id="usda-final-cal" step="0.1"></div>
-        <div><label>Protein (g)</label><input type="number" id="usda-final-pro" step="0.1"></div>
-      </div>
-      <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text);margin-bottom:12px">
-        <input type="checkbox" id="usda-save" style="width:auto"> Save to library
-      </label>
-      <button class="btn btn-primary" onclick="logUSDA()">Add to today</button>
-    </div>
-  </div>
-
-  <div id="log-library" class="hidden">
-    <div class="card">
-      <div class="card-title">Saved meals</div>
-      <input type="text" id="library-search" placeholder="Search saved meals..." oninput="renderLibrary()" style="margin-bottom:12px">
-      <div id="library-list"><div class="text-muted">No saved meals yet.</div></div>
-    </div>
-  </div>
-
-  <div id="log-newday" class="hidden">
-    <div class="card">
-      <div class="card-title">New Day</div>
-      <div class="text-muted mb" style="font-size:13px">Locks today into history and opens a fresh day.</div>
-      <div class="mb">
-        <label>Morning weight (kg)</label>
-        <input type="number" id="newday-weight" step="0.1" placeholder="e.g. 90.4">
-      </div>
-      <div class="text-muted mb" id="newday-label" style="font-size:13px"></div>
-      <button class="btn btn-primary" onclick="submitWeighIn()">Lock in & start new day</button>
+    <div class="auth-error" id="auth-error"></div>
+    <button class="btn btn-primary mt" onclick="submitAuth()" id="auth-btn">Sign in</button>
+    <div class="auth-toggle">
+      <span id="auth-toggle-link" onclick="toggleAuthMode()">Don't have an account? Sign up</span>
     </div>
   </div>
 </div>
 
-<!-- HISTORY -->
-<div id="screen-history" class="screen">
-  <div class="card">
-    <div class="card-title">Tracking history</div>
-    <div class="tbl-wrap">
-      <table>
-        <thead><tr><th>Day</th><th>Weight</th><th>kcal</th><th>Protein</th></tr></thead>
-        <tbody id="history-body"><tr><td colspan="4" class="spinner">Loading…</td></tr></tbody>
-      </table>
+<!-- MAIN APP (hidden until logged in) -->
+<div id="app" class="hidden">
+  <nav>
+    <button class="active" onclick="showScreen('today',this)">Today</button>
+    <button onclick="showScreen('log',this)">Log</button>
+    <button onclick="showScreen('history',this)">History</button>
+    <button onclick="showScreen('settings',this)">Settings</button>
+  </nav>
+
+  <div id="screen-today" class="screen active">
+    <div id="alerts-container"></div>
+    <div id="today-summary"></div>
+  </div>
+
+  <div id="screen-log" class="screen">
+    <div class="tab-row">
+      <div class="tab active" onclick="switchLogTab('manual',this)">Manual</div>
+      <div class="tab" onclick="switchLogTab('search',this)">USDA Search</div>
+      <div class="tab" onclick="switchLogTab('library',this)">Library</div>
+      <div class="tab" onclick="switchLogTab('newday',this)" style="color:var(--yellow)">New Day</div>
+    </div>
+    <div id="log-manual">
+      <div class="card">
+        <div class="card-title">Manual entry</div>
+        <div class="mb"><label>Meal name (optional)</label><input type="text" id="manual-name" placeholder="e.g. Hanamaru udon"></div>
+        <div class="row mb">
+          <div><label>Calories (kcal)</label><input type="number" id="manual-cal" step="0.1" placeholder="0"></div>
+          <div><label>Protein (g)</label><input type="number" id="manual-pro" step="0.1" placeholder="0"></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text);margin-bottom:12px">
+          <input type="checkbox" id="manual-save" style="width:auto"> Save to library
+        </label>
+        <button class="btn btn-primary" onclick="logManual()">Add to today</button>
+      </div>
+    </div>
+    <div id="log-search" class="hidden">
+      <div class="card">
+        <div class="card-title">USDA FoodData Central</div>
+        <div class="row mb">
+          <input type="text" id="usda-query" placeholder="Search food..." onkeydown="if(event.key==='Enter')searchUSDA()">
+          <button class="btn btn-primary btn-sm" onclick="searchUSDA()" style="flex:0 0 70px">Go</button>
+        </div>
+        <div id="usda-results"></div>
+      </div>
+      <div class="card hidden" id="usda-confirm-card">
+        <div class="card-title">Confirm & adjust</div>
+        <div id="usda-confirm-name" style="font-weight:600;margin-bottom:10px"></div>
+        <div class="row mb">
+          <div><label>Serving size (g)</label><input type="number" id="usda-serving" step="1" placeholder="100" oninput="recalcUSDA()"></div>
+          <div><label>Reference size (g)</label><input type="number" id="usda-ref" step="1" disabled></div>
+        </div>
+        <div class="row mb">
+          <div><label>Calories</label><input type="number" id="usda-final-cal" step="0.1"></div>
+          <div><label>Protein (g)</label><input type="number" id="usda-final-pro" step="0.1"></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text);margin-bottom:12px">
+          <input type="checkbox" id="usda-save" style="width:auto"> Save to library
+        </label>
+        <button class="btn btn-primary" onclick="logUSDA()">Add to today</button>
+      </div>
+    </div>
+    <div id="log-library" class="hidden">
+      <div class="card">
+        <div class="card-title">Saved meals</div>
+        <input type="text" id="library-search" placeholder="Search saved meals..." oninput="renderLibrary()" style="margin-bottom:12px">
+        <div id="library-list"><div class="text-muted">No saved meals yet.</div></div>
+      </div>
+    </div>
+    <div id="log-newday" class="hidden">
+      <div class="card">
+        <div class="card-title">New Day</div>
+        <div class="text-muted mb" style="font-size:13px">Locks today into history and opens a fresh day.</div>
+        <div class="mb"><label>Morning weight (kg)</label><input type="number" id="newday-weight" step="0.1" placeholder="e.g. 90.4"></div>
+        <div class="text-muted mb" id="newday-label" style="font-size:13px"></div>
+        <button class="btn btn-primary" onclick="submitWeighIn()">Lock in & start new day</button>
+      </div>
     </div>
   </div>
-</div>
 
-<!-- SETTINGS -->
-<div id="screen-settings" class="screen">
-  <div class="card">
-    <div class="card-title">Targets</div>
-    <div class="mb"><label>Calorie ceiling (kcal)</label><input type="number" id="s-cal-ceil"></div>
-    <div class="mb"><label>Protein floor (g)</label><input type="number" id="s-pro-floor"></div>
-    <div class="mb"><label>Protein ceiling (g)</label><input type="number" id="s-pro-ceil"></div>
-    <div class="mb"><label>Fat loss ratio (%)</label><input type="number" id="s-fat-ratio" step="1" min="1" max="100"></div>
-    <button class="btn btn-primary" onclick="saveSettings()">Save settings</button>
+  <div id="screen-history" class="screen">
+    <div class="card">
+      <div class="card-title">Tracking history</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Day</th><th>Weight</th><th>kcal</th><th>Protein</th></tr></thead>
+          <tbody id="history-body"><tr><td colspan="4" class="spinner">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-settings" class="screen">
+    <div class="card">
+      <div class="card-title">Targets</div>
+      <div class="mb"><label>Calorie ceiling (kcal)</label><input type="number" id="s-cal-ceil"></div>
+      <div class="mb"><label>Protein floor (g)</label><input type="number" id="s-pro-floor"></div>
+      <div class="mb"><label>Protein ceiling (g)</label><input type="number" id="s-pro-ceil"></div>
+      <div class="mb"><label>Fat loss ratio (%)</label><input type="number" id="s-fat-ratio" step="1" min="1" max="100"></div>
+      <button class="btn btn-primary" onclick="saveSettings()">Save settings</button>
+    </div>
+    <div class="card">
+      <div class="card-title">Account</div>
+      <div class="text-muted mb" id="settings-username" style="font-size:14px"></div>
+      <button class="btn btn-secondary" onclick="logout()">Sign out</button>
+    </div>
   </div>
 </div>
 
@@ -220,6 +245,86 @@ let historyDays = [];
 let libMeals = [];
 let libPending = null;
 let usdaPending = null;
+let currentUser = null; // { id, username }
+
+// ── AUTH ──────────────────────────────────────────────────────────
+let authMode = 'login'; // 'login' | 'signup'
+
+function toggleAuthMode() {
+  authMode = authMode === 'login' ? 'signup' : 'login';
+  const isLogin = authMode === 'login';
+  document.getElementById('auth-title').textContent = isLogin ? 'Welcome back' : 'Create account';
+  document.getElementById('auth-sub').textContent = isLogin ? 'Sign in to your account' : 'Pick a username and password';
+  document.getElementById('auth-btn').textContent = isLogin ? 'Sign in' : 'Sign up';
+  document.getElementById('auth-toggle-link').textContent = isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in';
+  document.getElementById('auth-error').textContent = '';
+}
+
+async function hashPassword(password) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function submitAuth() {
+  const username = document.getElementById('auth-username').value.trim().toLowerCase();
+  const password = document.getElementById('auth-password').value;
+  const errEl = document.getElementById('auth-error');
+  errEl.textContent = '';
+
+  if (!username || !password) { errEl.textContent = 'Please fill in both fields.'; return; }
+  if (password.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; return; }
+
+  const hash = await hashPassword(password);
+
+  if (authMode === 'signup') {
+    const { data: existing } = await sb.from('users').select('id').eq('username', username).maybeSingle();
+    if (existing) { errEl.textContent = 'Username already taken.'; return; }
+    const { data, error } = await sb.from('users').insert({ username, password_hash: hash }).select().single();
+    if (error) { errEl.textContent = 'Error creating account.'; return; }
+    loginSuccess(data);
+  } else {
+    const { data, error } = await sb.from('users').select('*').eq('username', username).maybeSingle();
+    if (error || !data) { errEl.textContent = 'Username not found.'; return; }
+    if (data.password_hash !== hash) { errEl.textContent = 'Incorrect password.'; return; }
+    loginSuccess(data);
+  }
+}
+
+function loginSuccess(user) {
+  currentUser = { id: user.id, username: user.username };
+  localStorage.setItem('nt_user', JSON.stringify(currentUser));
+  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('settings-username').textContent = 'Signed in as: ' + user.username;
+  loadApp();
+}
+
+function logout() {
+  localStorage.removeItem('nt_user');
+  currentUser = null;
+  todayDay = null;
+  todayMeals = [];
+  historyDays = [];
+  libMeals = [];
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('auth-screen').classList.remove('hidden');
+  document.getElementById('auth-username').value = '';
+  document.getElementById('auth-password').value = '';
+}
+
+function checkSavedLogin() {
+  const saved = localStorage.getItem('nt_user');
+  if (saved) {
+    try {
+      const user = JSON.parse(saved);
+      if (user.id && user.username) {
+        loginSuccess(user);
+        return true;
+      }
+    } catch(e) {}
+  }
+  return false;
+}
 
 // ── NAV ──────────────────────────────────────────────────────────
 function showScreen(name, btn) {
@@ -234,9 +339,7 @@ function showScreen(name, btn) {
 function switchLogTab(tab, el) {
   document.querySelectorAll('#screen-log .tab').forEach(t => t.classList.remove('active'));
   if (el) el.classList.add('active');
-  ['manual','search','library','newday'].forEach(t => {
-    document.getElementById('log-' + t).classList.add('hidden');
-  });
+  ['manual','search','library','newday'].forEach(t => document.getElementById('log-' + t).classList.add('hidden'));
   document.getElementById('log-' + tab).classList.remove('hidden');
   if (tab === 'library') renderLibrary();
   if (tab === 'newday') {
@@ -248,7 +351,7 @@ function switchLogTab(tab, el) {
 
 // ── SETTINGS ─────────────────────────────────────────────────────
 async function loadSettings() {
-  const { data } = await sb.from('settings').select('*');
+  const { data } = await sb.from('settings').select('*').eq('user_id', currentUser.id);
   if (!data) return;
   data.forEach(r => {
     if (r.key === 'calCeil') cfg.calCeil = +r.value;
@@ -268,64 +371,56 @@ async function saveSettings() {
   cfg.proCeil = +document.getElementById('s-pro-ceil').value;
   cfg.fatRatio = +document.getElementById('s-fat-ratio').value / 100;
   await sb.from('settings').upsert([
-    { key: 'calCeil', value: String(cfg.calCeil) },
-    { key: 'proFloor', value: String(cfg.proFloor) },
-    { key: 'proCeil', value: String(cfg.proCeil) },
-    { key: 'fatRatio', value: String(cfg.fatRatio) },
-  ], { onConflict: 'key' });
+    { key: 'calCeil', value: String(cfg.calCeil), user_id: currentUser.id },
+    { key: 'proFloor', value: String(cfg.proFloor), user_id: currentUser.id },
+    { key: 'proCeil', value: String(cfg.proCeil), user_id: currentUser.id },
+    { key: 'fatRatio', value: String(cfg.fatRatio), user_id: currentUser.id },
+  ], { onConflict: 'key,user_id' });
   alert('Settings saved.');
   renderToday();
 }
 
-// ── DATA LOADING ──────────────────────────────────────────────────
+// ── DATA ──────────────────────────────────────────────────────────
 async function loadHistory() {
-  const { data } = await sb.from('days').select('*').eq('locked', true).order('id', { ascending: true });
+  const { data } = await sb.from('days').select('*').eq('locked', true).eq('user_id', currentUser.id).order('id', { ascending: true });
   historyDays = data || [];
   if (historyDays.length > 35) historyDays = historyDays.slice(-35);
 }
 
 async function loadTodayMeals() {
   if (!todayDay) return;
-  const { data } = await sb.from('meals_today').select('*').eq('day_id', todayDay).order('logged_at', { ascending: true });
+  const { data } = await sb.from('meals_today').select('*').eq('day_id', todayDay).eq('user_id', currentUser.id).order('logged_at', { ascending: true });
   todayMeals = data || [];
 }
 
 async function loadLibrary() {
-  const { data } = await sb.from('library').select('*').order('name', { ascending: true });
+  const { data } = await sb.from('library').select('*').eq('user_id', currentUser.id).order('name', { ascending: true });
   libMeals = data || [];
 }
 
 async function detectOpenDay() {
-  const { data } = await sb.from('days').select('*').eq('locked', false).maybeSingle();
-  if (data) {
-    todayDay = data.id;
-    await loadTodayMeals();
-  }
+  const { data } = await sb.from('days').select('*').eq('locked', false).eq('user_id', currentUser.id).maybeSingle();
+  if (data) { todayDay = data.id; await loadTodayMeals(); }
 }
 
 // ── NEW DAY ───────────────────────────────────────────────────────
 async function submitWeighIn() {
   const w = parseFloat(document.getElementById('newday-weight').value);
   if (!w) { alert('Please enter your weight.'); return; }
-
   const maxDay = historyDays.length > 0 ? Math.max(...historyDays.map(d => d.id)) : 0;
   const dayNum = todayDay !== null ? todayDay + 1 : maxDay + 1;
-
   if (todayDay !== null) {
     const totalCal = todayMeals.reduce((s, m) => s + m.calories, 0);
     const totalPro = todayMeals.reduce((s, m) => s + m.protein, 0);
-    await sb.from('days').update({ calories: Math.round(totalCal), protein: Math.round(totalPro), locked: true }).eq('id', todayDay);
+    await sb.from('days').update({ calories: Math.round(totalCal), protein: Math.round(totalPro), locked: true }).eq('id', todayDay).eq('user_id', currentUser.id);
   }
-
   const today = new Date().toISOString().split('T')[0];
-  const { error } = await sb.from('days').upsert({ id: dayNum, date: today, weight_kg: w, calories: 0, protein: 0, locked: false }, { onConflict: 'id' });
+  const { error } = await sb.from('days').upsert({ id: dayNum, date: today, weight_kg: w, calories: 0, protein: 0, locked: false, user_id: currentUser.id }, { onConflict: 'id,user_id' });
   if (error) { alert('Error: ' + error.message); return; }
-
   todayDay = dayNum;
   todayMeals = [];
-  await sb.from('days').delete().lt('id', dayNum - 35);
+  await sb.from('days').delete().lt('id', dayNum - 35).eq('user_id', currentUser.id);
   await loadHistory();
-
   document.getElementById('newday-weight').value = '';
   showScreen('today', document.querySelector('nav button'));
 }
@@ -341,7 +436,6 @@ function renderToday() {
   const proPct = Math.min((totPro / cfg.proCeil) * 100, 100);
   const calColor = totCal >= cfg.calCeil ? 'var(--red)' : 'var(--accent)';
   const proColor = totPro >= cfg.proCeil ? 'var(--red)' : totPro >= cfg.proFloor ? 'var(--green)' : 'var(--yellow)';
-
   const mealsHTML = todayMeals.length === 0
     ? '<div class="text-muted">No meals logged yet.</div>'
     : todayMeals.map(m => `
@@ -355,19 +449,10 @@ function renderToday() {
           <button class="meal-del" onclick="deleteMeal('${m.id}')">×</button>
         </div>
       </div>`).join('');
-
   container.innerHTML = `
     <div class="stats-row">
-      <div class="stat-box">
-        <div class="stat-val">${totCal}</div>
-        <div class="stat-label">kcal today</div>
-        <div class="stat-sub">budget: ${budget}</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-val">${totPro}g</div>
-        <div class="stat-label">protein today</div>
-        <div class="stat-sub">floor: ${cfg.proFloor}g</div>
-      </div>
+      <div class="stat-box"><div class="stat-val">${totCal}</div><div class="stat-label">kcal today</div><div class="stat-sub">budget: ${budget}</div></div>
+      <div class="stat-box"><div class="stat-val">${totPro}g</div><div class="stat-label">protein today</div><div class="stat-sub">floor: ${cfg.proFloor}g</div></div>
     </div>
     <div class="card">
       <div class="card-title">Progress</div>
@@ -389,9 +474,7 @@ function renderToday() {
       <div class="card-title">Today's Meals <span class="dot-open"></span></div>
       ${mealsHTML}
     </div>
-    <button class="btn btn-secondary mt" onclick="showScreen('log',null)">+ Log a meal</button>
-  `;
-
+    <button class="btn btn-secondary mt" onclick="showScreen('log',null)">+ Log a meal</button>`;
   const alerts = [];
   if (totCal >= cfg.calCeil) alerts.push({ type: 'red', msg: '🔴 Calorie ceiling hit (' + cfg.calCeil + ' kcal)' });
   if (totPro >= cfg.proCeil) alerts.push({ type: 'red', msg: '🔴 Protein ceiling hit (' + cfg.proCeil + 'g)' });
@@ -404,18 +487,18 @@ async function addMeal(name, cal, pro, saveLib) {
   if (todayDay === null) { alert('Start a new day first via Log → New Day.'); return; }
   cal = +parseFloat(cal).toFixed(1);
   pro = +parseFloat(pro).toFixed(1);
-  const { data, error } = await sb.from('meals_today').insert({ day_id: todayDay, name, calories: cal, protein: pro }).select().single();
+  const { data, error } = await sb.from('meals_today').insert({ day_id: todayDay, name, calories: cal, protein: pro, user_id: currentUser.id }).select().single();
   if (error) { alert('Error: ' + error.message); return; }
   todayMeals.push(data);
   if (saveLib) {
-    await sb.from('library').upsert({ name, calories: cal, protein: pro }, { onConflict: 'name' });
+    await sb.from('library').upsert({ name, calories: cal, protein: pro, user_id: currentUser.id }, { onConflict: 'name,user_id' });
     await loadLibrary();
   }
   renderToday();
 }
 
 async function deleteMeal(id) {
-  await sb.from('meals_today').delete().eq('id', id);
+  await sb.from('meals_today').delete().eq('id', id).eq('user_id', currentUser.id);
   todayMeals = todayMeals.filter(m => m.id !== id);
   renderToday();
 }
@@ -445,22 +528,28 @@ async function searchUSDA() {
   if (!q) return;
   document.getElementById('usda-results').innerHTML = '<div class="spinner">Searching…</div>';
   document.getElementById('usda-confirm-card').classList.add('hidden');
-  try {
-    const res = await fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(q)}&pageSize=8&dataType=SR%20Legacy,Survey%20(FNDDS),Foundation&api_key=${USDA_KEY}`);
-    const data = await res.json();
-    const foods = data.foods || [];
-    if (foods.length === 0) { document.getElementById('usda-results').innerHTML = '<div class="text-muted">No results found.</div>'; return; }
-    document.getElementById('usda-results').innerHTML = foods.map(f => {
-      const cal = (f.foodNutrients || []).find(n => n.nutrientId === 1008 || n.nutrientName?.includes('Energy'))?.value || 0;
-      const pro = (f.foodNutrients || []).find(n => n.nutrientId === 1003 || n.nutrientName?.includes('Protein'))?.value || 0;
-      return `<div class="search-item" onclick='selectUSDA(${JSON.stringify({ name: f.description, cal, pro })})'>
-        <div class="search-item-name">${f.description}</div>
-        <div class="search-item-detail">${Math.round(cal)} kcal · ${pro}g protein per 100g</div>
-      </div>`;
-    }).join('');
-  } catch(e) {
-    document.getElementById('usda-results').innerHTML = '<div class="text-muted">Search failed.</div>';
+  const url = `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(q)}&pageSize=8&dataType=SR%20Legacy,Survey%20(FNDDS),Foundation&api_key=${USDA_KEY}`;
+  let lastErr = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      if (attempt > 1) await new Promise(r => setTimeout(r, 600 * attempt));
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const foods = data.foods || [];
+      if (foods.length === 0) { document.getElementById('usda-results').innerHTML = '<div class="text-muted">No results found.</div>'; return; }
+      document.getElementById('usda-results').innerHTML = foods.map(f => {
+        const cal = (f.foodNutrients || []).find(n => n.nutrientId === 1008 || n.nutrientName?.includes('Energy'))?.value || 0;
+        const pro = (f.foodNutrients || []).find(n => n.nutrientId === 1003 || n.nutrientName?.includes('Protein'))?.value || 0;
+        return `<div class="search-item" onclick='selectUSDA(${JSON.stringify({ name: f.description, cal, pro })})'>
+          <div class="search-item-name">${f.description}</div>
+          <div class="search-item-detail">${Math.round(cal)} kcal · ${pro}g protein per 100g</div>
+        </div>`;
+      }).join('');
+      return;
+    } catch(e) { lastErr = e; }
   }
+  document.getElementById('usda-results').innerHTML = '<div class="text-muted">Search failed after 3 attempts. Try again.</div>';
 }
 
 function selectUSDA(food) {
@@ -494,16 +583,10 @@ function renderLibrary() {
   const el = document.getElementById('library-list');
   const q = (document.getElementById('library-search')?.value || '').toLowerCase();
   const filtered = libMeals.filter(m => m.name.toLowerCase().includes(q));
-  if (filtered.length === 0) {
-    el.innerHTML = '<div class="text-muted">' + (libMeals.length === 0 ? 'No saved meals yet.' : 'No matches.') + '</div>';
-    return;
-  }
+  if (filtered.length === 0) { el.innerHTML = '<div class="text-muted">' + (libMeals.length === 0 ? 'No saved meals yet.' : 'No matches.') + '</div>'; return; }
   el.innerHTML = filtered.map(m => `
     <div class="meal-item">
-      <div>
-        <div class="meal-name">${m.name}</div>
-        <div class="meal-macros">${m.calories} kcal · ${m.protein}g protein</div>
-      </div>
+      <div><div class="meal-name">${m.name}</div><div class="meal-macros">${m.calories} kcal · ${m.protein}g protein</div></div>
       <button class="btn btn-primary btn-sm" onclick="openLibModal('${m.id}')">Log</button>
     </div>`).join('');
 }
@@ -521,15 +604,10 @@ function openLibModal(id) {
 function updatePctDisplay() {
   if (!libPending) return;
   const pct = parseInt(document.getElementById('pct-input').value) || 100;
-  const cal = (libPending.calories * pct / 100).toFixed(1);
-  const pro = (libPending.protein * pct / 100).toFixed(1);
-  document.getElementById('lib-modal-adjusted').textContent = cal + ' kcal · ' + pro + 'g protein';
+  document.getElementById('lib-modal-adjusted').textContent = (libPending.calories * pct / 100).toFixed(1) + ' kcal · ' + (libPending.protein * pct / 100).toFixed(1) + 'g protein';
 }
 
-function closeLibModal() {
-  document.getElementById('lib-modal').classList.add('hidden');
-  libPending = null;
-}
+function closeLibModal() { document.getElementById('lib-modal').classList.add('hidden'); libPending = null; }
 
 function confirmLibLog() {
   if (!libPending) return;
@@ -541,10 +619,7 @@ function confirmLibLog() {
 // ── HISTORY ───────────────────────────────────────────────────────
 function renderHistory() {
   const rows = [...historyDays];
-  if (rows.length === 0) {
-    document.getElementById('history-body').innerHTML = '<tr><td colspan="4" class="spinner">No data yet.</td></tr>';
-    return;
-  }
+  if (rows.length === 0) { document.getElementById('history-body').innerHTML = '<tr><td colspan="4" class="spinner">No data yet.</td></tr>'; return; }
   const last14 = rows.slice(-14);
   const avgCal = last14.reduce((s, d) => s + (d.calories || 0), 0) / last14.length;
   const avgPro = last14.reduce((s, d) => s + (d.protein || 0), 0) / last14.length;
@@ -561,15 +636,12 @@ function renderHistory() {
       <td>${d.protein != null ? d.protein + 'g' : '—'}</td>
     </tr>`).join('') + `
     <tr class="summary-row">
-      <td>TDEE: ${tdee} kcal</td>
-      <td>—</td>
-      <td>${Math.round(avgCal)}</td>
-      <td>${Math.round(avgPro)}g</td>
+      <td>TDEE: ${tdee} kcal</td><td>—</td><td>${Math.round(avgCal)}</td><td>${Math.round(avgPro)}g</td>
     </tr>`;
 }
 
 // ── INIT ──────────────────────────────────────────────────────────
-async function init() {
+async function loadApp() {
   await loadSettings();
   await loadHistory();
   await detectOpenDay();
@@ -577,7 +649,9 @@ async function init() {
   renderToday();
 }
 
-init();
+if (!checkSavedLogin()) {
+  // show auth screen (already visible by default)
+}
 </script>
 </body>
 </html>
