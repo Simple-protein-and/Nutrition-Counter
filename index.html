@@ -30,7 +30,6 @@
   .btn-sm { font-size: 13px; padding: 7px 12px; width: auto; display: inline-block; }
   .alert { border-radius: 8px; padding: 12px; margin-bottom: 10px; font-size: 14px; font-weight: 500; }
   .alert-green { background: #1b3d1e; border: 1px solid var(--green); color: var(--green); }
-  .alert-yellow { background: #3d2f00; border: 1px solid var(--yellow); color: var(--yellow); }
   .alert-red { background: #3d0f0f; border: 1px solid var(--red); color: var(--red); }
   .stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
   .stat-box { background: var(--surface2); border-radius: 8px; padding: 12px; text-align: center; }
@@ -66,24 +65,17 @@
   .modal { background: var(--surface); border-radius: var(--radius) var(--radius) 0 0; padding: 20px; width: 100%; max-width: 600px; margin: 0 auto; max-height: 85vh; overflow-y: auto; }
   .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
   .modal-close { float: right; background: none; border: none; color: var(--muted); font-size: 22px; cursor: pointer; line-height: 1; }
-  input[type=range] { padding: 0; background: none; border: none; accent-color: var(--accent); }
   .row { display: flex; gap: 10px; }
   .row > * { flex: 1; }
   .mt { margin-top: 12px; }
   .mb { margin-bottom: 12px; }
   .text-muted { color: var(--muted); font-size: 13px; }
-  .text-green { color: var(--green); }
   .hidden { display: none !important; }
   .spinner { text-align: center; padding: 20px; color: var(--muted); font-size: 14px; }
   .divider { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
 </style>
 </head>
 <body>
-
-<script>
-  const SUPABASE_URL = 'https://ujpffxdnvskzyojscsaa.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcGZmeGRudnNrenlvanNjc2FhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MTE0NDAsImV4cCI6MjA5NjA4NzQ0MH0.bGEOaKtiMqWW-ZufL99Uk_hJkuWlHkmx8Q-REhos_tc';
-</script>
 
 <nav>
   <button class="active" onclick="showScreen('today',this)">Today</button>
@@ -92,13 +84,13 @@
   <button onclick="showScreen('settings',this)">Settings</button>
 </nav>
 
-<!-- TODAY SCREEN -->
+<!-- TODAY -->
 <div id="screen-today" class="screen active">
   <div id="alerts-container"></div>
   <div id="today-summary"></div>
 </div>
 
-<!-- LOG SCREEN -->
+<!-- LOG -->
 <div id="screen-log" class="screen">
   <div class="tab-row">
     <div class="tab active" onclick="switchLogTab('manual',this)">Manual</div>
@@ -174,12 +166,12 @@
   </div>
 </div>
 
-<!-- HISTORY SCREEN -->
+<!-- HISTORY -->
 <div id="screen-history" class="screen">
   <div class="card">
     <div class="card-title">Tracking history</div>
     <div class="tbl-wrap">
-      <table id="history-table">
+      <table>
         <thead><tr><th>Day</th><th>Weight</th><th>kcal</th><th>Protein</th></tr></thead>
         <tbody id="history-body"><tr><td colspan="4" class="spinner">Loading…</td></tr></tbody>
       </table>
@@ -187,27 +179,26 @@
   </div>
 </div>
 
-<!-- SETTINGS SCREEN -->
+<!-- SETTINGS -->
 <div id="screen-settings" class="screen">
   <div class="card">
     <div class="card-title">Targets</div>
-    <div class="mb"><label>Calorie ceiling (kcal)</label><input type="number" id="s-cal-ceil" value="2400"></div>
-    <div class="mb"><label>Protein floor (g)</label><input type="number" id="s-pro-floor" value="88"></div>
-    <div class="mb"><label>Protein ceiling (g)</label><input type="number" id="s-pro-ceil" value="168"></div>
-    <div class="mb"><label>Fat loss ratio (%) — used in TDEE formula</label><input type="number" id="s-fat-ratio" value="100" step="1" min="1" max="100"></div>
+    <div class="mb"><label>Calorie ceiling (kcal)</label><input type="number" id="s-cal-ceil"></div>
+    <div class="mb"><label>Protein floor (g)</label><input type="number" id="s-pro-floor"></div>
+    <div class="mb"><label>Protein ceiling (g)</label><input type="number" id="s-pro-ceil"></div>
+    <div class="mb"><label>Fat loss ratio (%)</label><input type="number" id="s-fat-ratio" step="1" min="1" max="100"></div>
     <button class="btn btn-primary" onclick="saveSettings()">Save settings</button>
   </div>
 </div>
 
-<!-- LIBRARY PORTION MODAL -->
+<!-- LIBRARY MODAL -->
 <div class="modal-overlay hidden" id="lib-modal">
   <div class="modal">
     <button class="modal-close" onclick="closeLibModal()">×</button>
-    <div class="modal-title" id="lib-modal-title">Re-log meal</div>
+    <div class="modal-title" id="lib-modal-title"></div>
     <div id="lib-modal-macros" class="text-muted mb" style="font-size:14px"></div>
-    <label>Portion: <span id="pct-display">100%</span></label>
-    <input type="range" id="pct-slider" min="1" max="200" value="100" oninput="updatePctDisplay()" style="margin:10px 0 4px;width:100%">
-    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)"><span>1%</span><span>100%</span><span>200%</span></div>
+    <label>Portion %</label>
+    <input type="number" id="pct-input" min="1" max="200" value="100" oninput="updatePctDisplay()" style="margin:10px 0">
     <hr class="divider">
     <div id="lib-modal-adjusted" style="font-size:15px;font-weight:600;margin-bottom:16px"></div>
     <button class="btn btn-primary" onclick="confirmLibLog()">Add to today</button>
@@ -216,8 +207,11 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-let sb;
-try { sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch(e) {}
+const SUPABASE_URL = 'https://ujpffxdnvskzyojscsaa.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcGZmeGRudnNrenlvanNjc2FhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MTE0NDAsImV4cCI6MjA5NjA4NzQ0MH0.bGEOaKtiMqWW-ZufL99Uk_hJkuWlHkmx8Q-REhos_tc';
+const USDA_KEY = 'QchLTxDO9gwEsAbIEjwaXhrdqS22of1bFgrlMXoD';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let cfg = { calCeil: 2400, proFloor: 88, proCeil: 168, fatRatio: 1.0 };
 let todayDay = null;
@@ -227,6 +221,7 @@ let libMeals = [];
 let libPending = null;
 let usdaPending = null;
 
+// ── NAV ──────────────────────────────────────────────────────────
 function showScreen(name, btn) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
@@ -236,8 +231,23 @@ function showScreen(name, btn) {
   if (name === 'today') renderToday();
 }
 
+function switchLogTab(tab, el) {
+  document.querySelectorAll('#screen-log .tab').forEach(t => t.classList.remove('active'));
+  if (el) el.classList.add('active');
+  ['manual','search','library','newday'].forEach(t => {
+    document.getElementById('log-' + t).classList.add('hidden');
+  });
+  document.getElementById('log-' + tab).classList.remove('hidden');
+  if (tab === 'library') renderLibrary();
+  if (tab === 'newday') {
+    const maxDay = historyDays.length > 0 ? Math.max(...historyDays.map(d => d.id)) : (todayDay || 0);
+    const nextDay = todayDay !== null ? todayDay + 1 : maxDay + 1;
+    document.getElementById('newday-label').textContent = 'This will be logged as Day ' + nextDay;
+  }
+}
+
+// ── SETTINGS ─────────────────────────────────────────────────────
 async function loadSettings() {
-  if (!sb) return;
   const { data } = await sb.from('settings').select('*');
   if (!data) return;
   data.forEach(r => {
@@ -257,39 +267,35 @@ async function saveSettings() {
   cfg.proFloor = +document.getElementById('s-pro-floor').value;
   cfg.proCeil = +document.getElementById('s-pro-ceil').value;
   cfg.fatRatio = +document.getElementById('s-fat-ratio').value / 100;
-  if (!sb) { alert('Supabase not configured.'); return; }
-  const rows = [
+  await sb.from('settings').upsert([
     { key: 'calCeil', value: String(cfg.calCeil) },
     { key: 'proFloor', value: String(cfg.proFloor) },
     { key: 'proCeil', value: String(cfg.proCeil) },
     { key: 'fatRatio', value: String(cfg.fatRatio) },
-  ];
-  await sb.from('settings').upsert(rows, { onConflict: 'key' });
+  ], { onConflict: 'key' });
   alert('Settings saved.');
   renderToday();
 }
 
+// ── DATA LOADING ──────────────────────────────────────────────────
 async function loadHistory() {
-  if (!sb) return;
   const { data } = await sb.from('days').select('*').eq('locked', true).order('id', { ascending: true });
   historyDays = data || [];
   if (historyDays.length > 35) historyDays = historyDays.slice(-35);
 }
 
 async function loadTodayMeals() {
-  if (!sb || !todayDay) return;
+  if (!todayDay) return;
   const { data } = await sb.from('meals_today').select('*').eq('day_id', todayDay).order('logged_at', { ascending: true });
   todayMeals = data || [];
 }
 
 async function loadLibrary() {
-  if (!sb) return;
   const { data } = await sb.from('library').select('*').order('name', { ascending: true });
   libMeals = data || [];
 }
 
 async function detectOpenDay() {
-  if (!sb) return;
   const { data } = await sb.from('days').select('*').eq('locked', false).maybeSingle();
   if (data) {
     todayDay = data.id;
@@ -297,52 +303,44 @@ async function detectOpenDay() {
   }
 }
 
+// ── NEW DAY ───────────────────────────────────────────────────────
 async function submitWeighIn() {
   const w = parseFloat(document.getElementById('newday-weight').value);
   if (!w) { alert('Please enter your weight.'); return; }
-  if (!sb) { alert('Supabase not configured.'); return; }
 
   const maxDay = historyDays.length > 0 ? Math.max(...historyDays.map(d => d.id)) : 0;
   const dayNum = todayDay !== null ? todayDay + 1 : maxDay + 1;
 
-  // Lock current open day
   if (todayDay !== null) {
     const totalCal = todayMeals.reduce((s, m) => s + m.calories, 0);
     const totalPro = todayMeals.reduce((s, m) => s + m.protein, 0);
-    await sb.from('days').update({
-      calories: Math.round(totalCal),
-      protein: Math.round(totalPro),
-      locked: true
-    }).eq('id', todayDay);
+    await sb.from('days').update({ calories: Math.round(totalCal), protein: Math.round(totalPro), locked: true }).eq('id', todayDay);
   }
 
   const today = new Date().toISOString().split('T')[0];
-  const { error } = await sb.from('days').upsert({
-    id: dayNum, date: today, weight_kg: w, calories: 0, protein: 0, locked: false
-  }, { onConflict: 'id' });
-
+  const { error } = await sb.from('days').upsert({ id: dayNum, date: today, weight_kg: w, calories: 0, protein: 0, locked: false }, { onConflict: 'id' });
   if (error) { alert('Error: ' + error.message); return; }
+
   todayDay = dayNum;
   todayMeals = [];
-
   await sb.from('days').delete().lt('id', dayNum - 35);
   await loadHistory();
 
   document.getElementById('newday-weight').value = '';
   showScreen('today', document.querySelector('nav button'));
-  renderToday();
 }
 
+// ── TODAY ─────────────────────────────────────────────────────────
 function renderToday() {
   const container = document.getElementById('today-summary');
-  const totCal = todayDay === null ? 0 : +todayMeals.reduce((s, m) => s + m.calories, 0).toFixed(1);
-  const totPro = todayDay === null ? 0 : +todayMeals.reduce((s, m) => s + m.protein, 0).toFixed(1);
+  const totCal = +todayMeals.reduce((s, m) => s + m.calories, 0).toFixed(1);
+  const totPro = +todayMeals.reduce((s, m) => s + m.protein, 0).toFixed(1);
   const past13 = historyDays.slice(-13).reduce((s, d) => s + (d.calories || 0), 0);
   const budget = 33600 - past13;
   const calPct = Math.min((totCal / cfg.calCeil) * 100, 100);
   const proPct = Math.min((totPro / cfg.proCeil) * 100, 100);
-  const calBarColor = totCal >= cfg.calCeil ? 'var(--red)' : 'var(--accent)';
-  const proBarColor = totPro >= cfg.proCeil ? 'var(--red)' : totPro >= cfg.proFloor ? 'var(--green)' : 'var(--yellow)';
+  const calColor = totCal >= cfg.calCeil ? 'var(--red)' : 'var(--accent)';
+  const proColor = totPro >= cfg.proCeil ? 'var(--red)' : totPro >= cfg.proFloor ? 'var(--green)' : 'var(--yellow)';
 
   const mealsHTML = todayMeals.length === 0
     ? '<div class="text-muted">No meals logged yet.</div>'
@@ -352,7 +350,10 @@ function renderToday() {
           <div class="meal-name">${m.name || 'Meal'}</div>
           <div class="meal-macros">${m.calories} kcal · ${m.protein}g protein</div>
         </div>
-        <button class="meal-del" onclick="deleteMeal('${m.id}')">×</button>
+        <div style="display:flex;align-items:center;gap:6px">
+          <button class="btn btn-secondary btn-sm" onclick="repeatMeal('${m.id}')">+1</button>
+          <button class="meal-del" onclick="deleteMeal('${m.id}')">×</button>
+        </div>
       </div>`).join('');
 
   container.innerHTML = `
@@ -372,11 +373,11 @@ function renderToday() {
       <div class="card-title">Progress</div>
       <div class="prog-wrap">
         <div class="prog-label"><span>Calories</span><span>${totCal} / ${cfg.calCeil}</span></div>
-        <div class="prog-bar"><div class="prog-fill" style="width:${calPct}%;background:${calBarColor}"></div></div>
+        <div class="prog-bar"><div class="prog-fill" style="width:${calPct}%;background:${calColor}"></div></div>
       </div>
       <div class="prog-wrap">
         <div class="prog-label"><span>Protein</span><span>${totPro}g / ${cfg.proCeil}g</span></div>
-        <div class="prog-bar"><div class="prog-fill" style="width:${proPct}%;background:${proBarColor}"></div></div>
+        <div class="prog-bar"><div class="prog-fill" style="width:${proPct}%;background:${proColor}"></div></div>
       </div>
     </div>
     <div class="card">
@@ -398,8 +399,9 @@ function renderToday() {
   document.getElementById('alerts-container').innerHTML = alerts.map(a => `<div class="alert alert-${a.type}">${a.msg}</div>`).join('');
 }
 
+// ── MEALS ─────────────────────────────────────────────────────────
 async function addMeal(name, cal, pro, saveLib) {
-  if (!sb || todayDay === null) { alert('Start a new day first via Log → New Day.'); return; }
+  if (todayDay === null) { alert('Start a new day first via Log → New Day.'); return; }
   cal = +parseFloat(cal).toFixed(1);
   pro = +parseFloat(pro).toFixed(1);
   const { data, error } = await sb.from('meals_today').insert({ day_id: todayDay, name, calories: cal, protein: pro }).select().single();
@@ -413,10 +415,15 @@ async function addMeal(name, cal, pro, saveLib) {
 }
 
 async function deleteMeal(id) {
-  if (!sb) return;
   await sb.from('meals_today').delete().eq('id', id);
   todayMeals = todayMeals.filter(m => m.id !== id);
   renderToday();
+}
+
+async function repeatMeal(id) {
+  const m = todayMeals.find(m => m.id === id);
+  if (!m) return;
+  await addMeal(m.name, m.calories, m.protein, false);
 }
 
 function logManual() {
@@ -432,20 +439,21 @@ function logManual() {
   document.getElementById('manual-save').checked = false;
 }
 
+// ── USDA ──────────────────────────────────────────────────────────
 async function searchUSDA() {
   const q = document.getElementById('usda-query').value.trim();
   if (!q) return;
   document.getElementById('usda-results').innerHTML = '<div class="spinner">Searching…</div>';
   document.getElementById('usda-confirm-card').classList.add('hidden');
   try {
-    const res = await fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(q)}&pageSize=8&dataType=SR%20Legacy,Survey%20(FNDDS),Foundation&api_key=QchLTxDO9gwEsAbIEjwaXhrdqS22of1bFgrlMXoD`);
+    const res = await fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(q)}&pageSize=8&dataType=SR%20Legacy,Survey%20(FNDDS),Foundation&api_key=${USDA_KEY}`);
     const data = await res.json();
     const foods = data.foods || [];
     if (foods.length === 0) { document.getElementById('usda-results').innerHTML = '<div class="text-muted">No results found.</div>'; return; }
     document.getElementById('usda-results').innerHTML = foods.map(f => {
       const cal = (f.foodNutrients || []).find(n => n.nutrientId === 1008 || n.nutrientName?.includes('Energy'))?.value || 0;
       const pro = (f.foodNutrients || []).find(n => n.nutrientId === 1003 || n.nutrientName?.includes('Protein'))?.value || 0;
-      return `<div class="search-item" onclick='selectUSDA(${JSON.stringify({ id: f.fdcId, name: f.description, cal, pro, ref: 100 })})'>
+      return `<div class="search-item" onclick='selectUSDA(${JSON.stringify({ name: f.description, cal, pro })})'>
         <div class="search-item-name">${f.description}</div>
         <div class="search-item-detail">${Math.round(cal)} kcal · ${pro}g protein per 100g</div>
       </div>`;
@@ -481,6 +489,7 @@ function logUSDA() {
   usdaPending = null;
 }
 
+// ── LIBRARY ───────────────────────────────────────────────────────
 function renderLibrary() {
   const el = document.getElementById('library-list');
   const q = (document.getElementById('library-search')?.value || '').toLowerCase();
@@ -504,15 +513,14 @@ function openLibModal(id) {
   if (!libPending) return;
   document.getElementById('lib-modal-title').textContent = libPending.name;
   document.getElementById('lib-modal-macros').textContent = libPending.calories + ' kcal · ' + libPending.protein + 'g protein (100%)';
-  document.getElementById('pct-slider').value = 100;
+  document.getElementById('pct-input').value = 100;
   updatePctDisplay();
   document.getElementById('lib-modal').classList.remove('hidden');
 }
 
 function updatePctDisplay() {
   if (!libPending) return;
-  const pct = parseInt(document.getElementById('pct-slider').value);
-  document.getElementById('pct-display').textContent = pct + '%';
+  const pct = parseInt(document.getElementById('pct-input').value) || 100;
   const cal = (libPending.calories * pct / 100).toFixed(1);
   const pro = (libPending.protein * pct / 100).toFixed(1);
   document.getElementById('lib-modal-adjusted').textContent = cal + ' kcal · ' + pro + 'g protein';
@@ -525,24 +533,12 @@ function closeLibModal() {
 
 function confirmLibLog() {
   if (!libPending) return;
-  const pct = parseInt(document.getElementById('pct-slider').value);
+  const pct = parseInt(document.getElementById('pct-input').value) || 100;
   addMeal(libPending.name, (libPending.calories * pct / 100).toFixed(1), (libPending.protein * pct / 100).toFixed(1), false);
   closeLibModal();
 }
 
-function switchLogTab(tab, el) {
-  document.querySelectorAll('#screen-log .tab').forEach(t => t.classList.remove('active'));
-  if (el) el.classList.add('active');
-  ['manual','search','library','newday'].forEach(t => document.getElementById('log-'+t).classList.add('hidden'));
-  document.getElementById('log-' + tab).classList.remove('hidden');
-  if (tab === 'library') renderLibrary();
-  if (tab === 'newday') {
-    const maxDay = historyDays.length > 0 ? Math.max(...historyDays.map(d => d.id)) : (todayDay || 0);
-    const nextDay = todayDay !== null ? todayDay + 1 : maxDay + 1;
-    document.getElementById('newday-label').textContent = 'This will be logged as Day ' + nextDay;
-  }
-}
-
+// ── HISTORY ───────────────────────────────────────────────────────
 function renderHistory() {
   const rows = [...historyDays];
   if (rows.length === 0) {
@@ -552,13 +548,11 @@ function renderHistory() {
   const last14 = rows.slice(-14);
   const avgCal = last14.reduce((s, d) => s + (d.calories || 0), 0) / last14.length;
   const avgPro = last14.reduce((s, d) => s + (d.protein || 0), 0) / last14.length;
-  const window35 = rows.slice(-35);
-  const firstW = window35[0]?.weight_kg || 0;
-  const lastW = window35[window35.length - 1]?.weight_kg || firstW;
-  const kgLost = Math.max(0, firstW - lastW);
-  const totalCal = window35.reduce((s, d) => s + (d.calories || 0), 0);
-  const days = window35.length;
-  const tdee = days > 0 ? Math.round((totalCal + kgLost * cfg.fatRatio * 7700) / days) : 0;
+  const w0 = rows[0]?.weight_kg || 0;
+  const wN = rows[rows.length - 1]?.weight_kg || w0;
+  const kgLost = Math.max(0, w0 - wN);
+  const totalCal = rows.reduce((s, d) => s + (d.calories || 0), 0);
+  const tdee = rows.length > 0 ? Math.round((totalCal + kgLost * cfg.fatRatio * 7700) / rows.length) : 0;
   document.getElementById('history-body').innerHTML = rows.map(d => `
     <tr>
       <td>Day ${d.id}</td>
@@ -574,6 +568,7 @@ function renderHistory() {
     </tr>`;
 }
 
+// ── INIT ──────────────────────────────────────────────────────────
 async function init() {
   await loadSettings();
   await loadHistory();
