@@ -587,8 +587,34 @@ function renderLibrary() {
   el.innerHTML = filtered.map(m => `
     <div class="meal-item">
       <div><div class="meal-name">${m.name}</div><div class="meal-macros">${m.calories} kcal · ${m.protein}g protein</div></div>
-      <button class="btn btn-primary btn-sm" onclick="openLibModal('${m.id}')">Log</button>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="btn btn-secondary btn-sm" onclick="openLibModal('${m.id}')">Log</button>
+        <button class="btn btn-secondary btn-sm" onclick="editLibItem('${m.id}')">✏️</button>
+        <button class="meal-del" onclick="deleteLibItem('${m.id}')">×</button>
+      </div>
     </div>`).join('');
+}
+
+async function deleteLibItem(id) {
+  if (!confirm('Delete this item from your library?')) return;
+  await sb.from('library').delete().eq('id', id).eq('user_id', currentUser.id);
+  libMeals = libMeals.filter(m => m.id !== id);
+  renderLibrary();
+}
+
+function editLibItem(id) {
+  const m = libMeals.find(m => m.id === id);
+  if (!m) return;
+  const name = prompt('Meal name:', m.name);
+  if (name === null) return;
+  const cal = prompt('Calories:', m.calories);
+  if (cal === null) return;
+  const pro = prompt('Protein (g):', m.protein);
+  if (pro === null) return;
+  sb.from('library').update({ name: name.trim(), calories: +cal, protein: +pro }).eq('id', id).eq('user_id', currentUser.id).then(async () => {
+    await loadLibrary();
+    renderLibrary();
+  });
 }
 
 function openLibModal(id) {
