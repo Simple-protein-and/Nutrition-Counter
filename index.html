@@ -27,7 +27,6 @@
   .btn:active { opacity: .7; }
   .btn-primary { background: var(--accent); color: #fff; }
   .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
-  .btn-danger { background: var(--red); color: #fff; }
   .btn-sm { font-size: 13px; padding: 7px 12px; width: auto; display: inline-block; }
   .alert { border-radius: 8px; padding: 12px; margin-bottom: 10px; font-size: 14px; font-weight: 500; }
   .alert-green { background: #1b3d1e; border: 1px solid var(--green); color: var(--green); }
@@ -74,8 +73,6 @@
   .hidden { display: none !important; }
   .spinner { text-align: center; padding: 20px; color: var(--muted); font-size: 14px; }
   .divider { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
-
-  /* AUTH */
   #auth-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
   .auth-box { background: var(--surface); border-radius: var(--radius); padding: 28px; width: 100%; max-width: 400px; border: 1px solid var(--border); }
   .auth-title { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
@@ -87,28 +84,20 @@
 </head>
 <body>
 
-<!-- AUTH SCREEN -->
+<!-- AUTH -->
 <div id="auth-screen">
   <div class="auth-box">
     <div class="auth-title" id="auth-title">Welcome back</div>
     <div class="auth-sub" id="auth-sub">Sign in to your account</div>
-    <div class="mb">
-      <label>Username</label>
-      <input type="text" id="auth-username" placeholder="your username" autocomplete="username">
-    </div>
-    <div class="mb">
-      <label>Password</label>
-      <input type="password" id="auth-password" placeholder="your password" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitAuth()">
-    </div>
+    <div class="mb"><label>Username</label><input type="text" id="auth-username" placeholder="your username" autocomplete="username"></div>
+    <div class="mb"><label>Password</label><input type="password" id="auth-password" placeholder="your password" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitAuth()"></div>
     <div class="auth-error" id="auth-error"></div>
     <button class="btn btn-primary mt" onclick="submitAuth()" id="auth-btn">Sign in</button>
-    <div class="auth-toggle">
-      <span id="auth-toggle-link" onclick="toggleAuthMode()">Don't have an account? Sign up</span>
-    </div>
+    <div class="auth-toggle"><span id="auth-toggle-link" onclick="toggleAuthMode()">Don't have an account? Sign up</span></div>
   </div>
 </div>
 
-<!-- MAIN APP (hidden until logged in) -->
+<!-- MAIN APP -->
 <div id="app" class="hidden">
   <nav>
     <button class="active" onclick="showScreen('today',this)">Today</button>
@@ -235,21 +224,14 @@
 const SUPABASE_URL = 'https://ujpffxdnvskzyojscsaa.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcGZmeGRudnNrenlvanNjc2FhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MTE0NDAsImV4cCI6MjA5NjA4NzQ0MH0.bGEOaKtiMqWW-ZufL99Uk_hJkuWlHkmx8Q-REhos_tc';
 const USDA_KEY = 'QchLTxDO9gwEsAbIEjwaXhrdqS22of1bFgrlMXoD';
-
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let cfg = { calCeil: 2400, proFloor: 88, proCeil: 168, fatRatio: 1.0 };
-let todayDay = null;
-let todayMeals = [];
-let historyDays = [];
-let libMeals = [];
-let libPending = null;
-let usdaPending = null;
-let currentUser = null; // { id, username }
+let todayDay = null, todayMeals = [], historyDays = [], libMeals = [];
+let libPending = null, usdaPending = null, currentUser = null;
+let authMode = 'login';
 
 // ── AUTH ──────────────────────────────────────────────────────────
-let authMode = 'login'; // 'login' | 'signup'
-
 function toggleAuthMode() {
   authMode = authMode === 'login' ? 'signup' : 'login';
   const isLogin = authMode === 'login';
@@ -260,9 +242,9 @@ function toggleAuthMode() {
   document.getElementById('auth-error').textContent = '';
 }
 
-async function hashPassword(password) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+async function hashPassword(pw) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
 async function submitAuth() {
@@ -270,12 +252,9 @@ async function submitAuth() {
   const password = document.getElementById('auth-password').value;
   const errEl = document.getElementById('auth-error');
   errEl.textContent = '';
-
   if (!username || !password) { errEl.textContent = 'Please fill in both fields.'; return; }
   if (password.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; return; }
-
   const hash = await hashPassword(password);
-
   if (authMode === 'signup') {
     const { data: existing } = await sb.from('users').select('id').eq('username', username).maybeSingle();
     if (existing) { errEl.textContent = 'Username already taken.'; return; }
@@ -301,11 +280,7 @@ function loginSuccess(user) {
 
 function logout() {
   localStorage.removeItem('nt_user');
-  currentUser = null;
-  todayDay = null;
-  todayMeals = [];
-  historyDays = [];
-  libMeals = [];
+  currentUser = null; todayDay = null; todayMeals = []; historyDays = []; libMeals = [];
   document.getElementById('app').classList.add('hidden');
   document.getElementById('auth-screen').classList.remove('hidden');
   document.getElementById('auth-username').value = '';
@@ -317,10 +292,7 @@ function checkSavedLogin() {
   if (saved) {
     try {
       const user = JSON.parse(saved);
-      if (user.id && user.username) {
-        loginSuccess(user);
-        return true;
-      }
+      if (user.id && user.username) { loginSuccess(user); return true; }
     } catch(e) {}
   }
   return false;
@@ -339,8 +311,8 @@ function showScreen(name, btn) {
 function switchLogTab(tab, el) {
   document.querySelectorAll('#screen-log .tab').forEach(t => t.classList.remove('active'));
   if (el) el.classList.add('active');
-  ['manual','search','library','newday'].forEach(t => document.getElementById('log-' + t).classList.add('hidden'));
-  document.getElementById('log-' + tab).classList.remove('hidden');
+  ['manual','search','library','newday'].forEach(t => document.getElementById('log-'+t).classList.add('hidden'));
+  document.getElementById('log-'+tab).classList.remove('hidden');
   if (tab === 'library') renderLibrary();
   if (tab === 'newday') {
     const maxDay = historyDays.length > 0 ? Math.max(...historyDays.map(d => d.id)) : (todayDay || 0);
@@ -415,10 +387,9 @@ async function submitWeighIn() {
     await sb.from('days').update({ calories: Math.round(totalCal), protein: Math.round(totalPro), locked: true }).eq('id', todayDay).eq('user_id', currentUser.id);
   }
   const today = new Date().toISOString().split('T')[0];
-  const { error } = await sb.from('days').upsert({ id: dayNum, date: today, weight_kg: w, calories: 0, protein: 0, locked: false, user_id: currentUser.id }, { onConflict: 'id,user_id' });
+  const { error } = await sb.from('days').insert({ id: dayNum, date: today, weight_kg: w, calories: 0, protein: 0, locked: false, user_id: currentUser.id });
   if (error) { alert('Error: ' + error.message); return; }
-  todayDay = dayNum;
-  todayMeals = [];
+  todayDay = dayNum; todayMeals = [];
   await sb.from('days').delete().lt('id', dayNum - 35).eq('user_id', currentUser.id);
   await loadHistory();
   document.getElementById('newday-weight').value = '';
@@ -529,7 +500,6 @@ async function searchUSDA() {
   document.getElementById('usda-results').innerHTML = '<div class="spinner">Searching…</div>';
   document.getElementById('usda-confirm-card').classList.add('hidden');
   const url = `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(q)}&pageSize=8&dataType=SR%20Legacy,Survey%20(FNDDS),Foundation&api_key=${USDA_KEY}`;
-  let lastErr = null;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       if (attempt > 1) await new Promise(r => setTimeout(r, 600 * attempt));
@@ -547,7 +517,7 @@ async function searchUSDA() {
         </div>`;
       }).join('');
       return;
-    } catch(e) { lastErr = e; }
+    } catch(e) { /* retry */ }
   }
   document.getElementById('usda-results').innerHTML = '<div class="text-muted">Search failed after 3 attempts. Try again.</div>';
 }
@@ -588,15 +558,24 @@ function renderLibrary() {
     <div class="meal-item">
       <div><div class="meal-name">${m.name}</div><div class="meal-macros">${m.calories} kcal · ${m.protein}g protein</div></div>
       <div style="display:flex;gap:6px;align-items:center">
-        <button class="btn btn-secondary btn-sm" onclick="openLibModal('${m.id}')">Log</button>
-        <button class="btn btn-secondary btn-sm" onclick="editLibItem('${m.id}')">✏️</button>
-        <button class="meal-del" onclick="deleteLibItem('${m.id}')">×</button>
+        <button class="btn btn-primary btn-sm" onclick="openLibModal('${m.id}')">Log</button>
+        <button class="btn btn-secondary btn-sm" onclick="manageLibItem('${m.id}')">⋯</button>
       </div>
     </div>`).join('');
 }
 
+function manageLibItem(id) {
+  const m = libMeals.find(m => m.id === id);
+  if (!m) return;
+  const choice = confirm('Tap OK to edit, Cancel to delete.');
+  if (choice) {
+    editLibItem(id);
+  } else {
+    deleteLibItem(id);
+  }
+}
+
 async function deleteLibItem(id) {
-  if (!confirm('Delete this item from your library?')) return;
   await sb.from('library').delete().eq('id', id).eq('user_id', currentUser.id);
   libMeals = libMeals.filter(m => m.id !== id);
   renderLibrary();
@@ -675,9 +654,7 @@ async function loadApp() {
   renderToday();
 }
 
-if (!checkSavedLogin()) {
-  // show auth screen (already visible by default)
-}
+checkSavedLogin();
 </script>
 </body>
 </html>
