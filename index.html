@@ -650,6 +650,7 @@ function renderHistory() {
   const rows = [...historyDays];
   if (rows.length === 0) { document.getElementById('history-body').innerHTML = '<tr><td colspan="4" class="spinner">No data yet.</td></tr>'; return; }
   const last14 = rows.slice(-14);
+  const last14ids = new Set(last14.map(d => d.id));
   const avgCal = last14.reduce((s, d) => s + (d.calories || 0), 0) / last14.length;
   const avgPro = last14.reduce((s, d) => s + (d.protein || 0), 0) / last14.length;
   const w0 = rows[0]?.weight_kg || 0;
@@ -657,16 +658,20 @@ function renderHistory() {
   const kgLost = Math.max(0, w0 - wN);
   const totalCal = rows.reduce((s, d) => s + (d.calories || 0), 0);
   const tdee = rows.length > 0 ? Math.round((totalCal + kgLost * cfg.fatRatio * 7700) / rows.length) : 0;
-  document.getElementById('history-body').innerHTML = rows.map(d => `
-    <tr>
-      <td>Day ${d.id}</td>
-      <td>${d.weight_kg ? d.weight_kg + ' kg' : '—'}</td>
-      <td>${d.calories ?? '—'}</td>
-      <td>${d.protein != null ? d.protein + 'g' : '—'}</td>
-    </tr>`).join('') + `
+  const summaryRow = `
     <tr class="summary-row">
       <td>TDEE: ${tdee} kcal</td><td>—</td><td>${Math.round(avgCal)}</td><td>${Math.round(avgPro)}g</td>
     </tr>`;
+  const dataRows = [...rows].reverse().map(d => {
+    const p = last14ids.has(d.id) ? 'color:#8126ff' : '';
+    return `<tr>
+      <td style="${p}">Day ${d.id}</td>
+      <td style="${p}">${d.weight_kg ? d.weight_kg + ' kg' : '—'}</td>
+      <td style="${p}">${d.calories ?? '—'}</td>
+      <td style="${p}">${d.protein != null ? d.protein + 'g' : '—'}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('history-body').innerHTML = summaryRow + dataRows;
 }
 
 // ── INIT ──────────────────────────────────────────────────────────
