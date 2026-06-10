@@ -240,7 +240,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let cfg = { calCeil: 2400, proFloor: 88, proCeil: 168, fatRatio: 1.0 };
 let todayDay = null, todayMeals = [], historyDays = [], libMeals = [];
-let libPending = null, usdaPending = null, currentUser = null;
+let todayWeight = null;
 let authMode = 'login';
 
 // ── AUTH ──────────────────────────────────────────────────────────
@@ -384,7 +384,7 @@ async function loadLibrary() {
 
 async function detectOpenDay() {
   const { data } = await sb.from('days').select('*').eq('locked', false).eq('user_id', currentUser.id).maybeSingle();
-  if (data) { todayDay = data.id; await loadTodayMeals(); }
+  if (data) { todayDay = data.id; todayWeight = data.weight_kg; await loadTodayMeals(); }
 }
 
 // ── NEW DAY ───────────────────────────────────────────────────────
@@ -401,7 +401,7 @@ async function submitWeighIn() {
   const today = new Date().toISOString().split('T')[0];
   const { error } = await sb.from('days').insert({ id: dayNum, date: today, weight_kg: w, calories: 0, protein: 0, locked: false, user_id: currentUser.id });
   if (error) { alert('Error: ' + error.message); return; }
-  todayDay = dayNum; todayMeals = [];
+  todayDay = dayNum; todayMeals = []; todayWeight = w;
   await sb.from('days').delete().lt('id', dayNum - 35).eq('user_id', currentUser.id);
   await loadHistory();
   document.getElementById('newday-weight').value = '';
@@ -654,7 +654,7 @@ function renderHistory() {
   const avgCal = last14.reduce((s, d) => s + (d.calories || 0), 0) / last14.length;
   const avgPro = last14.reduce((s, d) => s + (d.protein || 0), 0) / last14.length;
   const w0 = rows[0]?.weight_kg || 0;
-  const wN = rows[rows.length - 1]?.weight_kg || w0;
+  const wN = todayWeight !== null ? todayWeight : (rows[rows.length - 1]?.weight_kg || w0);
   const kgLost = Math.max(0, w0 - wN);
   const totalCal = rows.reduce((s, d) => s + (d.calories || 0), 0);
   const tdee = rows.length > 0 ? Math.round((totalCal + kgLost * cfg.fatRatio * 7700) / rows.length) : 0;
