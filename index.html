@@ -431,6 +431,7 @@ function renderToday() {
   const past13 = historyDays.slice(-13).reduce((s, d) => s + (d.calories || 0), 0);
   const budget = 33600 - past13;
   const remaining = +(cfg.calCeil - totCal).toFixed(1);
+  const remainingToMax = +(budget - totCal).toFixed(1);
   const calPct = Math.min((totCal / cfg.calCeil) * 100, 100);
   const proPct = Math.min((totPro / cfg.proCeil) * 100, 100);
   const calColor = totCal >= cfg.calCeil ? 'var(--red)' : 'var(--accent)';
