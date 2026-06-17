@@ -430,13 +430,21 @@ function renderToday() {
   const totPro = +todayMeals.reduce((s, m) => s + m.protein, 0).toFixed(1);
   const past13 = historyDays.slice(-13).reduce((s, d) => s + (d.calories || 0), 0);
   const budget = 33600 - past13;
+  // Tomorrow's max: pretend today's current total is locked, use past 12 locked days + today
+  const past12 = historyDays.slice(-12).reduce((s, d) => s + (d.calories || 0), 0);
+  const tomorrowMax = 33600 - past12 - totCal;
   const remaining = +(cfg.calCeil - totCal).toFixed(1);
   const remainingToMax = +(budget - totCal).toFixed(1);
   const calPct = Math.min((totCal / cfg.calCeil) * 100, 100);
   const proPct = Math.min((totPro / cfg.proCeil) * 100, 100);
   const calColor = totCal >= cfg.calCeil ? 'var(--red)' : 'var(--accent)';
   const proColor = totPro >= cfg.proCeil ? 'var(--red)' : totPro >= cfg.proFloor ? 'var(--green)' : 'var(--yellow)';
-  const remainingColor = remaining < 0 ? 'var(--red)' : remaining < 200 ? 'var(--yellow)' : 'var(--muted)';
+  const remainingColor = remaining > 0 ? 'var(--muted)' : remainingToMax > 0 ? 'var(--yellow)' : 'var(--red)';
+  const remainingText = remaining > 0
+    ? remaining + ' until 2,400'
+    : remainingToMax > 0
+      ? remainingToMax + ' until daily max'
+      : Math.abs(remainingToMax) + ' over daily max';
   const mealsHTML = todayMeals.length === 0
     ? '<div class="text-muted">No meals logged yet.</div>'
     : todayMeals.map(m => `
@@ -455,7 +463,7 @@ function renderToday() {
       <div class="stat-box">
         <div class="stat-val">${totCal}</div>
         <div class="stat-label">kcal today</div>
-        <div class="stat-sub" style="color:${remainingColor}">${remaining >= 0 ? remaining + ' remaining' : Math.abs(remaining) + ' over'}</div>
+        <div class="stat-sub" style="color:${remainingColor}">${remainingText}</div>
       </div>
       <div class="stat-box">
         <div class="stat-val">${totPro}g</div>
@@ -476,7 +484,10 @@ function renderToday() {
     </div>
     <div class="card">
       <div class="card-title">Today's Max</div>
-      <div style="font-size:22px;font-weight:700">${budget > 0 ? budget + ' kcal' : '\u26a0\ufe0f Over budget'}</div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <div style="font-size:22px;font-weight:700">${budget > 0 ? budget + ' kcal' : '\u26a0\ufe0f Over'}</div>
+        <div style="font-size:14px;color:var(--muted)">tmrw: <span style="color:${tomorrowMax < 2000 ? 'var(--yellow)' : 'var(--text)'};font-weight:600">${tomorrowMax} kcal</span></div>
+      </div>
       <div class="text-muted mt" style="font-size:12px">Needed to bring 14-day average to 2,400</div>
     </div>
     <div class="card">
