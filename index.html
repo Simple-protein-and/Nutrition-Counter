@@ -48,6 +48,7 @@
   td { padding: 10px 8px; text-align: right; border-bottom: 1px solid var(--border); }
   td:first-child { text-align: left; }
   tr.summary-row td { background: var(--surface2); font-weight: 700; font-size: 13px; color: var(--accent); border-top: 2px solid var(--accent); }
+  tr.ffmi-row td { background: var(--surface2); font-size: 13px; color: var(--muted); border-bottom: 1px solid var(--border); }
   .dot-open { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-left: 4px; vertical-align: middle; }
   .meal-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
   .meal-item:last-child { border-bottom: none; }
@@ -198,9 +199,19 @@
       <button class="btn btn-primary" onclick="saveSettings()">Save settings</button>
     </div>
     <div class="card">
+      <div class="card-title">Body composition</div>
+      <div class="mb"><label>Height (cm)</label><input type="number" id="s-height" placeholder="e.g. 184"></div>
+      <div class="mb"><label>Body fat %</label><input type="number" id="s-bodyfat" step="0.1" placeholder="e.g. 18"></div>
+      <button class="btn btn-primary" onclick="saveSettings()">Save settings</button>
+    </div>
+    <div class="card">
       <div class="card-title">Account</div>
       <div class="text-muted mb" id="settings-username" style="font-size:14px"></div>
       <button class="btn btn-secondary" onclick="logout()">Sign out</button>
+    </div>
+    <div class="card">
+      <div class="card-title">App info</div>
+      <div class="text-muted" style="font-size:13px" id="version-display"></div>
     </div>
   </div>
 </div>
@@ -250,9 +261,10 @@
 const SUPABASE_URL = 'https://ujpffxdnvskzyojscsaa.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcGZmeGRudnNrenlvanNjc2FhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MTE0NDAsImV4cCI6MjA5NjA4NzQ0MH0.bGEOaKtiMqWW-ZufL99Uk_hJkuWlHkmx8Q-REhos_tc';
 const USDA_KEY = 'QchLTxDO9gwEsAbIEjwaXhrdqS22of1bFgrlMXoD';
+const VERSION = '1445.18.06';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-let cfg = { calCeil: 2400, proFloor: 88, proCeil: 168, fatRatio: 1.0 };
+let cfg = { calCeil: 2400, proFloor: 88, proCeil: 168, fatRatio: 1.0, height: 0, bodyFat: 0 };
 let todayDay = null, todayMeals = [], historyDays = [], libMeals = [];
 let libPending = null, managePending = null, usdaPending = null, currentUser = null;
 let todayWeight = null;
@@ -302,6 +314,7 @@ function loginSuccess(user) {
   document.getElementById('auth-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('settings-username').textContent = 'Signed in as: ' + user.username;
+  document.getElementById('version-display').textContent = 'Version ' + VERSION;
   loadApp();
 }
 
@@ -357,11 +370,15 @@ async function loadSettings() {
     if (r.key === 'proFloor') cfg.proFloor = +r.value;
     if (r.key === 'proCeil') cfg.proCeil = +r.value;
     if (r.key === 'fatRatio') cfg.fatRatio = +r.value;
+    if (r.key === 'height') cfg.height = +r.value;
+    if (r.key === 'bodyFat') cfg.bodyFat = +r.value;
   });
   document.getElementById('s-cal-ceil').value = cfg.calCeil;
   document.getElementById('s-pro-floor').value = cfg.proFloor;
   document.getElementById('s-pro-ceil').value = cfg.proCeil;
   document.getElementById('s-fat-ratio').value = +(cfg.fatRatio * 100).toFixed(0);
+  document.getElementById('s-height').value = cfg.height || '';
+  document.getElementById('s-bodyfat').value = cfg.bodyFat || '';
 }
 
 async function saveSettings() {
@@ -369,14 +386,26 @@ async function saveSettings() {
   cfg.proFloor = +document.getElementById('s-pro-floor').value;
   cfg.proCeil = +document.getElementById('s-pro-ceil').value;
   cfg.fatRatio = +document.getElementById('s-fat-ratio').value / 100;
+  cfg.height = +document.getElementById('s-height').value;
+  cfg.bodyFat = +document.getElementById('s-bodyfat').value;
   await sb.from('settings').upsert([
     { key: 'calCeil', value: String(cfg.calCeil), user_id: currentUser.id },
     { key: 'proFloor', value: String(cfg.proFloor), user_id: currentUser.id },
     { key: 'proCeil', value: String(cfg.proCeil), user_id: currentUser.id },
     { key: 'fatRatio', value: String(cfg.fatRatio), user_id: currentUser.id },
+    { key: 'height', value: String(cfg.height), user_id: currentUser.id },
+    { key: 'bodyFat', value: String(cfg.bodyFat), user_id: currentUser.id },
   ], { onConflict: 'key,user_id' });
   alert('Settings saved.');
   renderToday();
+}
+
+// ── FFMI ─────────────────────────────────────────────────────────
+function calcFFMI(weightKg, heightCm, bodyFatPct) {
+  if (!weightKg || !heightCm || !bodyFatPct) return null;
+  const heightM = heightCm / 100;
+  const leanMass = weightKg * (1 - bodyFatPct / 100);
+  return (leanMass / (heightM * heightM)).toFixed(1);
 }
 
 // ── DATA ──────────────────────────────────────────────────────────
@@ -430,7 +459,6 @@ function renderToday() {
   const totPro = +todayMeals.reduce((s, m) => s + m.protein, 0).toFixed(1);
   const past13 = historyDays.slice(-13).reduce((s, d) => s + (d.calories || 0), 0);
   const budget = 33600 - past13;
-  // Tomorrow's max: pretend today's current total is locked, use past 12 locked days + today
   const past12 = historyDays.slice(-12).reduce((s, d) => s + (d.calories || 0), 0);
   const tomorrowMax = 33600 - past12 - totCal;
   const remaining = +(cfg.calCeil - totCal).toFixed(1);
@@ -447,59 +475,38 @@ function renderToday() {
       : Math.abs(remainingToMax) + ' over daily max';
   const mealsHTML = todayMeals.length === 0
     ? '<div class="text-muted">No meals logged yet.</div>'
-    : todayMeals.map(m => `
-      <div class="meal-item">
-        <div>
-          <div class="meal-name">${m.name || 'Meal'}</div>
-          <div class="meal-macros">${m.calories} kcal · ${m.protein}g protein</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px">
-          <button class="btn btn-secondary btn-sm" onclick="repeatMeal('${m.id}')">+1</button>
-          <button class="meal-del" onclick="deleteMeal('${m.id}')">×</button>
-        </div>
-      </div>`).join('');
-  container.innerHTML = `
-    <div class="stats-row">
-      <div class="stat-box">
-        <div class="stat-val">${totCal}</div>
-        <div class="stat-label">kcal today</div>
-        <div class="stat-sub" style="color:${remainingColor}">${remainingText}</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-val">${totPro}g</div>
-        <div class="stat-label">protein today</div>
-        <div class="stat-sub">floor: ${cfg.proFloor}g</div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-title">Progress</div>
-      <div class="prog-wrap">
-        <div class="prog-label"><span>Calories</span><span>${totCal} / ${cfg.calCeil}</span></div>
-        <div class="prog-bar"><div class="prog-fill" style="width:${calPct}%;background:${calColor}"></div></div>
-      </div>
-      <div class="prog-wrap">
-        <div class="prog-label"><span>Protein</span><span>${totPro}g / ${cfg.proCeil}g</span></div>
-        <div class="prog-bar"><div class="prog-fill" style="width:${proPct}%;background:${proColor}"></div></div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-title">Today's Max</div>
-      <div style="display:flex;justify-content:space-between;align-items:baseline">
-        <div style="font-size:22px;font-weight:700">${budget > 0 ? budget + ' kcal' : '\u26a0\ufe0f Over'}</div>
-        <div style="font-size:14px;color:var(--muted)">tmrw: <span style="color:${tomorrowMax < 2000 ? 'var(--yellow)' : 'var(--text)'};font-weight:600">${tomorrowMax} kcal</span></div>
-      </div>
-      <div class="text-muted mt" style="font-size:12px">Needed to bring 14-day average to 2,400</div>
-    </div>
-    <div class="card">
-      <div class="card-title">Today's Meals <span class="dot-open"></span></div>
-      ${mealsHTML}
-    </div>
-    <button class="btn btn-secondary mt" onclick="showScreen('log',null)">+ Log a meal</button>`;
+    : todayMeals.map(m =>
+        '<div class="meal-item">' +
+          '<div><div class="meal-name">' + (m.name || 'Meal') + '</div><div class="meal-macros">' + m.calories + ' kcal \u00b7 ' + m.protein + 'g protein</div></div>' +
+          '<div style="display:flex;align-items:center;gap:6px">' +
+            '<button class="btn btn-secondary btn-sm" onclick="repeatMeal(\'' + m.id + '\')">+1</button>' +
+            '<button class="meal-del" onclick="deleteMeal(\'' + m.id + '\')">&#215;</button>' +
+          '</div>' +
+        '</div>'
+      ).join('');
+  container.innerHTML =
+    '<div class="stats-row">' +
+      '<div class="stat-box"><div class="stat-val">' + totCal + '</div><div class="stat-label">kcal today</div><div class="stat-sub" style="color:' + remainingColor + '">' + remainingText + '</div></div>' +
+      '<div class="stat-box"><div class="stat-val">' + totPro + 'g</div><div class="stat-label">protein today</div><div class="stat-sub">floor: ' + cfg.proFloor + 'g</div></div>' +
+    '</div>' +
+    '<div class="card"><div class="card-title">Progress</div>' +
+      '<div class="prog-wrap"><div class="prog-label"><span>Calories</span><span>' + totCal + ' / ' + cfg.calCeil + '</span></div><div class="prog-bar"><div class="prog-fill" style="width:' + calPct + '%;background:' + calColor + '"></div></div></div>' +
+      '<div class="prog-wrap"><div class="prog-label"><span>Protein</span><span>' + totPro + 'g / ' + cfg.proCeil + 'g</span></div><div class="prog-bar"><div class="prog-fill" style="width:' + proPct + '%;background:' + proColor + '"></div></div></div>' +
+    '</div>' +
+    '<div class="card"><div class="card-title">Today\'s Max</div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:baseline">' +
+        '<div style="font-size:22px;font-weight:700">' + (budget > 0 ? budget + ' kcal' : '\u26a0\ufe0f Over') + '</div>' +
+        '<div style="font-size:14px;color:var(--muted)">tmrw: <span style="color:' + (tomorrowMax < 2000 ? 'var(--yellow)' : 'var(--text)') + ';font-weight:600">' + Math.round(tomorrowMax) + ' kcal</span></div>' +
+      '</div>' +
+      '<div class="text-muted mt" style="font-size:12px">Needed to bring 14-day average to 2,400</div>' +
+    '</div>' +
+    '<div class="card"><div class="card-title">Today\'s Meals <span class="dot-open"></span></div>' + mealsHTML + '</div>' +
+    '<button class="btn btn-secondary mt" onclick="showScreen(\'log\',null)">+ Log a meal</button>';
   const alerts = [];
   if (totCal >= cfg.calCeil) alerts.push({ type: 'red', msg: '\uD83D\uDD34 Calorie ceiling hit (' + cfg.calCeil + ' kcal)' });
   if (totPro >= cfg.proCeil) alerts.push({ type: 'red', msg: '\uD83D\uDD34 Protein ceiling hit (' + cfg.proCeil + 'g)' });
   if (totPro >= cfg.proFloor && totPro < cfg.proCeil) alerts.push({ type: 'green', msg: '\u2705 Protein floor met (' + cfg.proFloor + 'g)' });
-  document.getElementById('alerts-container').innerHTML = alerts.map(a => `<div class="alert alert-${a.type}">${a.msg}</div>`).join('');
+  document.getElementById('alerts-container').innerHTML = alerts.map(a => '<div class="alert alert-' + a.type + '">' + a.msg + '</div>').join('');
 }
 
 // ── MEALS ─────────────────────────────────────────────────────────
@@ -558,10 +565,10 @@ async function searchUSDA() {
       const foods = data.foods || [];
       if (foods.length === 0) { document.getElementById('usda-results').innerHTML = '<div class="text-muted">No results found.</div>'; return; }
       document.getElementById('usda-results').innerHTML = foods.map(f => {
-        const cal = (f.foodNutrients || []).find(n => n.nutrientId === 1008 || (n.nutrientName && n.nutrientName.includes('Energy')));
-        const pro = (f.foodNutrients || []).find(n => n.nutrientId === 1003 || (n.nutrientName && n.nutrientName.includes('Protein')));
-        const calVal = cal ? cal.value : 0;
-        const proVal = pro ? pro.value : 0;
+        const calN = (f.foodNutrients || []).find(n => n.nutrientId === 1008 || (n.nutrientName && n.nutrientName.includes('Energy')));
+        const proN = (f.foodNutrients || []).find(n => n.nutrientId === 1003 || (n.nutrientName && n.nutrientName.includes('Protein')));
+        const calVal = calN ? calN.value : 0;
+        const proVal = proN ? proN.value : 0;
         return '<div class="search-item" onclick=\'selectUSDA(' + JSON.stringify({ name: f.description, cal: calVal, pro: proVal }) + ')\'>' +
           '<div class="search-item-name">' + f.description + '</div>' +
           '<div class="search-item-detail">' + Math.round(calVal) + ' kcal \u00b7 ' + proVal + 'g protein per 100g</div>' +
@@ -701,7 +708,11 @@ function renderHistory() {
   const kgLost = Math.max(0, w0 - wN);
   const totalCal = rows.reduce((s, d) => s + (d.calories || 0), 0);
   const tdee = rows.length > 0 ? Math.round((totalCal + kgLost * cfg.fatRatio * 7700) / rows.length) : 0;
+  const ffmi = calcFFMI(todayWeight, cfg.height, cfg.bodyFat);
   const summaryRow = '<tr class="summary-row"><td>TDEE: ' + tdee + ' kcal</td><td>\u2014</td><td>' + Math.round(avgCal) + '</td><td>' + Math.round(avgPro) + 'g</td></tr>';
+  const ffmiRow = ffmi !== null
+    ? '<tr class="ffmi-row"><td>FFMI: ' + ffmi + '</td><td colspan="3" style="color:var(--muted);font-size:12px">based on today\'s weight · ' + (todayWeight || '\u2014') + ' kg · ' + cfg.bodyFat + '% BF</td></tr>'
+    : '';
   const todayRow = todayDay !== null && todayWeight !== null
     ? '<tr><td style="color:var(--accent)">Day ' + todayDay + ' \u25c4</td><td style="color:var(--accent)">' + todayWeight + ' kg</td><td style="color:var(--muted)">\u2014</td><td style="color:var(--muted)">\u2014</td></tr>'
     : '';
@@ -714,7 +725,7 @@ function renderHistory() {
       '<td style="' + p + '">' + (d.protein != null ? d.protein + 'g' : '\u2014') + '</td>' +
       '</tr>';
   }).join('');
-  document.getElementById('history-body').innerHTML = summaryRow + todayRow + dataRows;
+  document.getElementById('history-body').innerHTML = summaryRow + ffmiRow + todayRow + dataRows;
 }
 
 // ── INIT ──────────────────────────────────────────────────────────
