@@ -709,10 +709,8 @@ function renderHistory() {
   const totalCal = rows.reduce((s, d) => s + (d.calories || 0), 0);
   const tdee = rows.length > 0 ? Math.round((totalCal + kgLost * cfg.fatRatio * 7700) / rows.length) : 0;
   const ffmi = calcFFMI(todayWeight, cfg.height, cfg.bodyFat);
-  const summaryRow = '<tr class="summary-row"><td>TDEE: ' + tdee + ' kcal</td><td>\u2014</td><td>' + Math.round(avgCal) + '</td><td>' + Math.round(avgPro) + 'g</td></tr>';
-  const ffmiRow = ffmi !== null
-    ? '<tr class="ffmi-row"><td>FFMI: ' + ffmi + '</td><td colspan="3" style="color:var(--muted);font-size:12px">based on today\'s weight · ' + (todayWeight || '\u2014') + ' kg · ' + cfg.bodyFat + '% BF</td></tr>'
-    : '';
+  const summaryRow = '<tr class="summary-row"><td>TDEE: ' + tdee + ' kcal</td><td>' + (ffmi !== null ? 'FFMI: ' + ffmi : '\u2014') + '</td><td>' + Math.round(avgCal) + '</td><td>' + Math.round(avgPro) + 'g</td></tr>';
+  const ffmiRow = '';
   const todayRow = todayDay !== null && todayWeight !== null
     ? '<tr><td style="color:var(--accent)">Day ' + todayDay + ' \u25c4</td><td style="color:var(--accent)">' + todayWeight + ' kg</td><td style="color:var(--muted)">\u2014</td><td style="color:var(--muted)">\u2014</td></tr>'
     : '';
@@ -725,7 +723,7 @@ function renderHistory() {
       '<td style="' + p + '">' + (d.protein != null ? d.protein + 'g' : '\u2014') + '</td>' +
       '</tr>';
   }).join('');
-  document.getElementById('history-body').innerHTML = summaryRow + ffmiRow + todayRow + dataRows;
+  document.getElementById('history-body').innerHTML = summaryRow + todayRow + dataRows;
 }
 
 // ── INIT ──────────────────────────────────────────────────────────
