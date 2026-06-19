@@ -458,9 +458,9 @@ function renderToday() {
   const totCal = +todayMeals.reduce((s, m) => s + m.calories, 0).toFixed(1);
   const totPro = +todayMeals.reduce((s, m) => s + m.protein, 0).toFixed(1);
   const past13 = historyDays.slice(-13).reduce((s, d) => s + (d.calories || 0), 0);
-  const budget = 33600 - past13;
+  const budget = (cfg.calCeil * 14) - past13;
   const past12 = historyDays.slice(-12).reduce((s, d) => s + (d.calories || 0), 0);
-  const tomorrowMax = 33600 - past12 - totCal;
+  const tomorrowMax = (cfg.calCeil * 14) - past12 - totCal;
   const remaining = +(cfg.calCeil - totCal).toFixed(1);
   const remainingToMax = +(budget - totCal).toFixed(1);
   const calPct = Math.min((totCal / cfg.calCeil) * 100, 100);
@@ -469,7 +469,7 @@ function renderToday() {
   const proColor = totPro >= cfg.proCeil ? 'var(--red)' : totPro >= cfg.proFloor ? 'var(--green)' : 'var(--yellow)';
   const remainingColor = remaining > 0 ? 'var(--muted)' : remainingToMax > 0 ? 'var(--yellow)' : 'var(--red)';
   const remainingText = remaining > 0
-    ? remaining + ' until 2,400'
+    ? remaining + ' until ' + cfg.calCeil.toLocaleString()
     : remainingToMax > 0
       ? remainingToMax + ' until daily max'
       : Math.abs(remainingToMax) + ' over daily max';
@@ -498,7 +498,7 @@ function renderToday() {
         '<div style="font-size:22px;font-weight:700">' + (budget > 0 ? budget + ' kcal' : '\u26a0\ufe0f Over') + '</div>' +
         '<div style="font-size:14px;color:var(--muted)">tmrw: <span style="color:' + (tomorrowMax < 2000 ? 'var(--yellow)' : 'var(--text)') + ';font-weight:600">' + Math.round(tomorrowMax) + ' kcal</span></div>' +
       '</div>' +
-      '<div class="text-muted mt" style="font-size:12px">Needed to bring 14-day average to 2,400</div>' +
+      '<div class="text-muted mt" style="font-size:12px">Needed to bring 14-day average to ' + cfg.calCeil.toLocaleString() + '</div>' +
     '</div>' +
     '<div class="card"><div class="card-title">Today\'s Meals <span class="dot-open"></span></div>' + mealsHTML + '</div>' +
     '<button class="btn btn-secondary mt" onclick="showScreen(\'log\',null)">+ Log a meal</button>';
