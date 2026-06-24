@@ -264,7 +264,7 @@
 const SUPABASE_URL = 'https://ujpffxdnvskzyojscsaa.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcGZmeGRudnNrenlvanNjc2FhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MTE0NDAsImV4cCI6MjA5NjA4NzQ0MH0.bGEOaKtiMqWW-ZufL99Uk_hJkuWlHkmx8Q-REhos_tc';
 const USDA_KEY = 'QchLTxDO9gwEsAbIEjwaXhrdqS22of1bFgrlMXoD';
-const VERSION = '1445.18.06';
+const VERSION = '0930.24.06';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let cfg = { calCeil: 2500, proFloor: 88, proCeil: 168, fatRatio: 1.0, height: 0, bodyFat: 0, autoAdjust: false, deficit: 500 };
@@ -421,13 +421,28 @@ function calcFFMI(weightKg, heightCm, bodyFatPct) {
   return (lean / (hM * hM)).toFixed(1);
 }
 
-// TDEE helper (shared between today and history)
+// TDEE
 function calcTDEE(rows, wN) {
   if (rows.length === 0) return 0;
   const w0 = rows[0].weight_kg || 0;
   const kgLost = Math.max(0, w0 - wN);
   const totalCal = rows.reduce((s, d) => s + (d.calories || 0), 0);
   return Math.round((totalCal + kgLost * cfg.fatRatio * 7700) / rows.length);
+}
+
+function getEffectiveCeil(tdeeVal) {
+  if (cfg.autoAdjust && tdeeVal > 0) {
+    // Use rolling average of stored TDEE estimates if available
+    const estimates = historyDays.filter(d => d.tdee_estimate && d.tdee_estimate > 0).map(d => d.tdee_estimate);
+    if (estimates.length > 0) {
+      const window = estimates.slice(-21);
+      const avg = Math.round(window.reduce((s, v) => s + v, 0) / window.length);
+      return avg - cfg.deficit;
+    }
+    // Fall back to live TDEE if no stored estimates yet
+    return tdeeVal - cfg.deficit;
+  }
+  return cfg.calCeil;
 }
 
 // DATA
@@ -462,7 +477,15 @@ async function submitWeighIn() {
   if (todayDay !== null) {
     const totalCal = todayMeals.reduce((s, m) => s + m.calories, 0);
     const totalPro = todayMeals.reduce((s, m) => s + m.protein, 0);
-    await sb.from('days').update({ calories: Math.round(totalCal), protein: Math.round(totalPro), locked: true }).eq('id', todayDay).eq('user_id', currentUser.id);
+    // Calculate and store TDEE estimate for the day being locked
+    const wN = w; // tomorrow's morning weight = today's endpoint
+    const tdeeEst = calcTDEE(historyDays, wN);
+    await sb.from('days').update({
+      calories: Math.round(totalCal),
+      protein: Math.round(totalPro),
+      locked: true,
+      tdee_estimate: tdeeEst
+    }).eq('id', todayDay).eq('user_id', currentUser.id);
   }
   const today = new Date().toISOString().split('T')[0];
   const { error } = await sb.from('days').insert({ id: dayNum, date: today, weight_kg: w, calories: 0, protein: 0, locked: false, user_id: currentUser.id });
@@ -479,28 +502,22 @@ function renderToday() {
   const container = document.getElementById('today-summary');
   const totCal = +todayMeals.reduce((s, m) => s + m.calories, 0).toFixed(1);
   const totPro = +todayMeals.reduce((s, m) => s + m.protein, 0).toFixed(1);
-
   const wN = todayWeight !== null ? todayWeight : (historyDays.length > 0 ? (historyDays[historyDays.length-1].weight_kg || 0) : 0);
   const tdeeNow = calcTDEE(historyDays, wN);
-  const effectiveCeil = cfg.autoAdjust && tdeeNow > 0 ? tdeeNow - cfg.deficit : cfg.calCeil;
-
+  const effectiveCeil = getEffectiveCeil(tdeeNow);
   const past13 = historyDays.slice(-13).reduce((s, d) => s + (d.calories || 0), 0);
   const budget = (effectiveCeil * 14) - past13;
-  const past12 = historyDays.slice(-12).reduce((s, d) => s + (d.calories || 0), 0);
-  const tomorrowMax = (effectiveCeil * 14) - past12 - totCal;
-
   const remaining = +(effectiveCeil - totCal).toFixed(1);
   const remainingToMax = +(budget - totCal).toFixed(1);
   const calPct = Math.min((totCal / effectiveCeil) * 100, 100);
   const proPct = Math.min((totPro / cfg.proCeil) * 100, 100);
   const calColor = totCal >= effectiveCeil ? 'var(--red)' : 'var(--accent)';
   const proColor = totPro >= cfg.proCeil ? 'var(--red)' : totPro >= cfg.proFloor ? 'var(--green)' : 'var(--yellow)';
-  const remainingColor = remaining > 0 ? 'var(--muted)' : remainingToMax > 0 ? 'var(--yellow)' : 'var(--red)';
-  const remainingText = remaining > 0
-    ? remaining + ' until ' + effectiveCeil.toLocaleString()
-    : remainingToMax > 0
-      ? remainingToMax + ' until daily max'
-      : Math.abs(remainingToMax) + ' over daily max';
+
+  // Remaining color and label
+  const remainingColor = remaining > 0 ? 'var(--accent)' : remainingToMax > 0 ? 'var(--yellow)' : 'var(--red)';
+  const remainingLabel = remaining > 0 ? 'kcal remaining' : remainingToMax > 0 ? 'kcal over ceiling' : 'kcal over max';
+  const remainingDisplay = remaining > 0 ? remaining : remaining <= 0 && remainingToMax > 0 ? Math.abs(remaining) : Math.abs(remainingToMax);
 
   const mealsHTML = todayMeals.length === 0
     ? '<div class="text-muted">No meals logged yet.</div>'
@@ -516,7 +533,11 @@ function renderToday() {
 
   container.innerHTML =
     '<div class="stats-row">' +
-      '<div class="stat-box"><div class="stat-val">' + totCal + '</div><div class="stat-label">kcal today</div><div class="stat-sub" style="color:' + remainingColor + '">' + remainingText + '</div></div>' +
+      '<div class="stat-box">' +
+        '<div class="stat-val" style="color:' + remainingColor + '">' + remainingDisplay + '</div>' +
+        '<div class="stat-label" style="color:' + remainingColor + '">' + remainingLabel + '</div>' +
+        '<div class="stat-sub">' + totCal + ' eaten</div>' +
+      '</div>' +
       '<div class="stat-box"><div class="stat-val">' + totPro + 'g</div><div class="stat-label">protein today</div><div class="stat-sub">floor: ' + cfg.proFloor + 'g</div></div>' +
     '</div>' +
     '<div class="card"><div class="card-title">Progress</div>' +
@@ -524,10 +545,7 @@ function renderToday() {
       '<div class="prog-wrap"><div class="prog-label"><span>Protein</span><span>' + totPro + 'g / ' + cfg.proCeil + 'g</span></div><div class="prog-bar"><div class="prog-fill" style="width:' + proPct + '%;background:' + proColor + '"></div></div></div>' +
     '</div>' +
     '<div class="card"><div class="card-title">Today\'s Max</div>' +
-      '<div style="display:flex;justify-content:space-between;align-items:baseline">' +
-        '<div style="font-size:22px;font-weight:700">' + (budget > 0 ? budget + ' kcal' : 'Over') + '</div>' +
-        '<div style="font-size:14px;color:var(--muted)">tmrw: <span style="color:' + (tomorrowMax < 2000 ? 'var(--yellow)' : 'var(--text)') + ';font-weight:600">' + Math.round(tomorrowMax) + ' kcal</span></div>' +
-      '</div>' +
+      '<div style="font-size:22px;font-weight:700">' + (budget > 0 ? budget + ' kcal' : 'Over') + '</div>' +
       '<div class="text-muted mt" style="font-size:12px">Needed to bring 14-day average to ' + effectiveCeil.toLocaleString() + '</div>' +
     '</div>' +
     '<div class="card"><div class="card-title">Today\'s Meals <span class="dot-open"></span></div>' + mealsHTML + '</div>' +
