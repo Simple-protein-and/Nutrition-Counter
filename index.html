@@ -548,7 +548,7 @@ function renderToday() {
   const proColor = totPro >= cfg.proCeil ? 'var(--red)' : totPro >= cfg.proFloor ? 'var(--green)' : 'var(--yellow)';
 
   const remainingColor = remaining > 0 ? 'var(--accent)' : remainingToMax > 0 ? 'var(--yellow)' : 'var(--red)';
- >const remainingLabel = remaining > 0 ? 'kcal remaining' : remainingToMax > 0 ? 'kcal until daily max' : 'kcal over daily max';
+  const remainingLabel = remaining > 0 ? 'kcal remaining' : remainingToMax > 0 ? 'kcal until daily max' : 'kcal over daily max';
   const remainingDisplay = remaining > 0 ? remaining : remainingToMax > 0 ? remainingToMax : Math.abs(remainingToMax);
     
   const mealsHTML = todayMeals.length === 0
