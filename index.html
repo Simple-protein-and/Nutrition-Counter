@@ -10,6 +10,7 @@
     --text: #f0f0f0; --muted: #888; --accent: #4a9eff; --green: #4caf50;
     --yellow: #ffb300; --red: #f44336; --radius: 10px;
     --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --pink: #ff4dc4;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
@@ -80,6 +81,8 @@
   .auth-toggle { text-align: center; margin-top: 16px; font-size: 14px; color: var(--muted); }
   .auth-toggle span { color: var(--accent); cursor: pointer; }
   .auth-error { color: var(--red); font-size: 13px; margin-top: 8px; min-height: 18px; }
+  .settings-divider { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+  .settings-section-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -190,7 +193,9 @@
 
   <div id="screen-settings" class="screen">
     <div class="card">
-      <div class="card-title">Targets</div>
+      <div class="card-title">Settings</div>
+
+      <div class="settings-section-label">Targets</div>
       <div class="mb"><label>Calorie ceiling (kcal) — or deficit if auto-adjust is on</label><input type="number" id="s-cal-ceil"></div>
       <div class="mb" style="display:flex;align-items:center;gap:10px">
         <input type="checkbox" id="s-auto-adjust" style="width:auto;margin:0">
@@ -199,20 +204,21 @@
       <div class="mb"><label>Protein floor (g)</label><input type="number" id="s-pro-floor"></div>
       <div class="mb"><label>Protein ceiling (g)</label><input type="number" id="s-pro-ceil"></div>
       <div class="mb"><label>Fat loss ratio (%)</label><input type="number" id="s-fat-ratio" step="1" min="1" max="100"></div>
-      <button class="btn btn-primary" onclick="saveSettings()">Save settings</button>
-    </div>
-    <div class="card">
-      <div class="card-title">Rolling windows</div>
-      <div class="mb"><label>Calorie rolling average (days)</label><input type="number" id="s-cal-window" step="1" min="1" placeholder="14"></div>
-      <div class="mb"><label>TDEE smoothing window (days)</label><input type="number" id="s-tdee-window" step="1" min="1" placeholder="21"></div>
-      <button class="btn btn-primary" onclick="saveSettings()">Save settings</button>
-    </div>
-    <div class="card">
-      <div class="card-title">Body composition</div>
+
+      <hr class="settings-divider">
+      <div class="settings-section-label">Rolling windows</div>
+      <div class="mb"><label>Calorie rolling average window (days)</label><input type="number" id="s-cal-window" step="1" min="1" placeholder="14"></div>
+      <div class="mb"><label>TDEE calculation window (days) — how far back to look at calories + weight</label><input type="number" id="s-tdee-calc-window" step="1" min="1" placeholder="35"></div>
+      <div class="mb"><label>TDEE smoothing window — number of past daily TDEE estimates to average</label><input type="number" id="s-tdee-smooth-window" step="1" min="1" placeholder="21"></div>
+
+      <hr class="settings-divider">
+      <div class="settings-section-label">Body composition</div>
       <div class="mb"><label>Height (cm)</label><input type="number" id="s-height" placeholder="e.g. 184"></div>
       <div class="mb"><label>Body fat %</label><input type="number" id="s-bodyfat" step="0.1" placeholder="e.g. 18"></div>
-      <button class="btn btn-primary" onclick="saveSettings()">Save settings</button>
+
+      <button class="btn btn-primary mt" onclick="saveSettings()">Save settings</button>
     </div>
+
     <div class="card">
       <div class="card-title">Account</div>
       <div class="text-muted mb" id="settings-username" style="font-size:14px"></div>
@@ -270,14 +276,17 @@
 const SUPABASE_URL = 'https://ujpffxdnvskzyojscsaa.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcGZmeGRudnNrenlvanNjc2FhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MTE0NDAsImV4cCI6MjA5NjA4NzQ0MH0.bGEOaKtiMqWW-ZufL99Uk_hJkuWlHkmx8Q-REhos_tc';
 const USDA_KEY = 'QchLTxDO9gwEsAbIEjwaXhrdqS22of1bFgrlMXoD';
-const VERSION = '0930.24.06';
+const VERSION = '0931.26.06';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const HISTORY_CAP = 50;
 
 let cfg = {
   calCeil: 2500, proFloor: 88, proCeil: 168, fatRatio: 1.0,
   height: 0, bodyFat: 0, autoAdjust: false, deficit: 500,
-  calWindow: 14,   // rolling average window for calories/protein
-  tdeeWindow: 21   // TDEE smoothing window (stored estimates to average)
+  calWindow: 14,        // rolling average window for calories/protein display + budget
+  tdeeCalcWindow: 35,   // how many days of history feed into calcTDEE()
+  tdeeSmoothWindow: 21  // how many stored daily TDEE estimates to average in getEffectiveCeil()
 };
 let todayDay = null, todayMeals = [], historyDays = [], libMeals = [];
 let libPending = null, managePending = null, usdaPending = null, currentUser = null;
@@ -389,7 +398,8 @@ async function loadSettings() {
     if (r.key === 'autoAdjust') cfg.autoAdjust = r.value === 'true';
     if (r.key === 'deficit') cfg.deficit = +r.value;
     if (r.key === 'calWindow') cfg.calWindow = +r.value;
-    if (r.key === 'tdeeWindow') cfg.tdeeWindow = +r.value;
+    if (r.key === 'tdeeCalcWindow') cfg.tdeeCalcWindow = +r.value;
+    if (r.key === 'tdeeSmoothWindow') cfg.tdeeSmoothWindow = +r.value;
   });
   document.getElementById('s-cal-ceil').value = cfg.autoAdjust ? cfg.deficit : cfg.calCeil;
   document.getElementById('s-auto-adjust').checked = cfg.autoAdjust;
@@ -399,7 +409,8 @@ async function loadSettings() {
   document.getElementById('s-height').value = cfg.height || '';
   document.getElementById('s-bodyfat').value = cfg.bodyFat || '';
   document.getElementById('s-cal-window').value = cfg.calWindow;
-  document.getElementById('s-tdee-window').value = cfg.tdeeWindow;
+  document.getElementById('s-tdee-calc-window').value = cfg.tdeeCalcWindow;
+  document.getElementById('s-tdee-smooth-window').value = cfg.tdeeSmoothWindow;
 }
 
 async function saveSettings() {
@@ -409,24 +420,26 @@ async function saveSettings() {
   } else {
     cfg.calCeil = +document.getElementById('s-cal-ceil').value;
   }
-  cfg.proFloor = +document.getElementById('s-pro-floor').value;
-  cfg.proCeil = +document.getElementById('s-pro-ceil').value;
-  cfg.fatRatio = +document.getElementById('s-fat-ratio').value / 100;
-  cfg.height = +document.getElementById('s-height').value;
-  cfg.bodyFat = +document.getElementById('s-bodyfat').value;
-  cfg.calWindow = Math.max(1, +document.getElementById('s-cal-window').value || 14);
-  cfg.tdeeWindow = Math.max(1, +document.getElementById('s-tdee-window').value || 21);
+  cfg.proFloor    = +document.getElementById('s-pro-floor').value;
+  cfg.proCeil     = +document.getElementById('s-pro-ceil').value;
+  cfg.fatRatio    = +document.getElementById('s-fat-ratio').value / 100;
+  cfg.height      = +document.getElementById('s-height').value;
+  cfg.bodyFat     = +document.getElementById('s-bodyfat').value;
+  cfg.calWindow         = Math.max(1, +document.getElementById('s-cal-window').value || 14);
+  cfg.tdeeCalcWindow    = Math.max(1, +document.getElementById('s-tdee-calc-window').value || 35);
+  cfg.tdeeSmoothWindow  = Math.max(1, +document.getElementById('s-tdee-smooth-window').value || 21);
   await sb.from('settings').upsert([
-    { key: 'calCeil',     value: String(cfg.calCeil),     user_id: currentUser.id },
-    { key: 'proFloor',    value: String(cfg.proFloor),    user_id: currentUser.id },
-    { key: 'proCeil',     value: String(cfg.proCeil),     user_id: currentUser.id },
-    { key: 'fatRatio',    value: String(cfg.fatRatio),    user_id: currentUser.id },
-    { key: 'height',      value: String(cfg.height),      user_id: currentUser.id },
-    { key: 'bodyFat',     value: String(cfg.bodyFat),     user_id: currentUser.id },
-    { key: 'autoAdjust',  value: String(cfg.autoAdjust),  user_id: currentUser.id },
-    { key: 'deficit',     value: String(cfg.deficit),     user_id: currentUser.id },
-    { key: 'calWindow',   value: String(cfg.calWindow),   user_id: currentUser.id },
-    { key: 'tdeeWindow',  value: String(cfg.tdeeWindow),  user_id: currentUser.id },
+    { key: 'calCeil',           value: String(cfg.calCeil),           user_id: currentUser.id },
+    { key: 'proFloor',          value: String(cfg.proFloor),          user_id: currentUser.id },
+    { key: 'proCeil',           value: String(cfg.proCeil),           user_id: currentUser.id },
+    { key: 'fatRatio',          value: String(cfg.fatRatio),          user_id: currentUser.id },
+    { key: 'height',            value: String(cfg.height),            user_id: currentUser.id },
+    { key: 'bodyFat',           value: String(cfg.bodyFat),           user_id: currentUser.id },
+    { key: 'autoAdjust',        value: String(cfg.autoAdjust),        user_id: currentUser.id },
+    { key: 'deficit',           value: String(cfg.deficit),           user_id: currentUser.id },
+    { key: 'calWindow',         value: String(cfg.calWindow),         user_id: currentUser.id },
+    { key: 'tdeeCalcWindow',    value: String(cfg.tdeeCalcWindow),    user_id: currentUser.id },
+    { key: 'tdeeSmoothWindow',  value: String(cfg.tdeeSmoothWindow),  user_id: currentUser.id },
   ], { onConflict: 'key,user_id' });
   alert('Settings saved.');
   renderToday();
@@ -440,13 +453,14 @@ function calcFFMI(weightKg, heightCm, bodyFatPct) {
   return (lean / (hM * hM)).toFixed(1);
 }
 
-// TDEE
+// TDEE — slices to cfg.tdeeCalcWindow before calculating
 function calcTDEE(rows, wN) {
-  if (rows.length === 0) return 0;
-  const w0 = rows[0].weight_kg || 0;
+  const window = rows.slice(-cfg.tdeeCalcWindow);
+  if (window.length === 0) return 0;
+  const w0 = window[0].weight_kg || 0;
   const kgLost = Math.max(0, w0 - wN);
-  const totalCal = rows.reduce((s, d) => s + (d.calories || 0), 0);
-  return Math.round((totalCal + kgLost * cfg.fatRatio * 7700) / rows.length);
+  const totalCal = window.reduce((s, d) => s + (d.calories || 0), 0);
+  return Math.round((totalCal + kgLost * cfg.fatRatio * 7700) / window.length);
 }
 
 function getEffectiveCeil(tdeeVal) {
@@ -454,7 +468,7 @@ function getEffectiveCeil(tdeeVal) {
     const stored = historyDays
       .filter(d => d.tdee_estimate && d.tdee_estimate > 0)
       .map(d => d.tdee_estimate);
-    const allEstimates = [...stored, tdeeVal].slice(-cfg.tdeeWindow);
+    const allEstimates = [...stored, tdeeVal].slice(-cfg.tdeeSmoothWindow);
     const avg = Math.round(allEstimates.reduce((s, v) => s + v, 0) / allEstimates.length);
     return avg - cfg.deficit;
   }
@@ -463,11 +477,9 @@ function getEffectiveCeil(tdeeVal) {
 
 // DATA
 async function loadHistory() {
-  // Keep enough rows for whichever window is larger, plus a small buffer
-  const retainDays = Math.max(cfg.calWindow, cfg.tdeeWindow) + 5;
   const { data } = await sb.from('days').select('*').eq('locked', true).eq('user_id', currentUser.id).order('id', { ascending: true });
   historyDays = data || [];
-  if (historyDays.length > retainDays) historyDays = historyDays.slice(-retainDays);
+  if (historyDays.length > HISTORY_CAP) historyDays = historyDays.slice(-HISTORY_CAP);
 }
 
 async function loadTodayMeals() {
@@ -495,8 +507,7 @@ async function submitWeighIn() {
   if (todayDay !== null) {
     const totalCal = todayMeals.reduce((s, m) => s + m.calories, 0);
     const totalPro = todayMeals.reduce((s, m) => s + m.protein, 0);
-    const wN = w;
-    const tdeeEst = calcTDEE(historyDays, wN);
+    const tdeeEst = calcTDEE(historyDays, w);
     await sb.from('days').update({
       calories: Math.round(totalCal),
       protein: Math.round(totalPro),
@@ -508,9 +519,8 @@ async function submitWeighIn() {
   const { error } = await sb.from('days').insert({ id: dayNum, date: today, weight_kg: w, calories: 0, protein: 0, locked: false, user_id: currentUser.id });
   if (error) { alert('Error: ' + error.message); return; }
   todayDay = dayNum; todayMeals = []; todayWeight = w;
-  // Prune old rows, keeping enough for the largest window plus buffer
-  const retainDays = Math.max(cfg.calWindow, cfg.tdeeWindow) + 5;
-  await sb.from('days').delete().lt('id', dayNum - retainDays).eq('user_id', currentUser.id);
+  // Prune anything beyond the 50-day hard cap
+  await sb.from('days').delete().lt('id', dayNum - HISTORY_CAP).eq('user_id', currentUser.id);
   await loadHistory();
   document.getElementById('newday-weight').value = '';
   showScreen('today', document.querySelector('nav button'));
@@ -525,13 +535,12 @@ function renderToday() {
   const tdeeNow = calcTDEE(historyDays, wN);
   const effectiveCeil = getEffectiveCeil(tdeeNow);
 
-  // Rolling window budget: how many kcal are left to eat today to stay on average
   const W = cfg.calWindow;
-  const pastDays = historyDays.slice(-(W - 1));           // up to W-1 locked days
+  const pastDays = historyDays.slice(-(W - 1));
   const pastCal  = pastDays.reduce((s, d) => s + (d.calories || 0), 0);
-  const budget   = (effectiveCeil * W) - pastCal;         // total budget for the window
-  const remaining        = +(effectiveCeil - totCal).toFixed(1);
-  const remainingToMax   = +(budget - totCal).toFixed(1);
+  const budget   = (effectiveCeil * W) - pastCal;
+  const remaining      = +(effectiveCeil - totCal).toFixed(1);
+  const remainingToMax = +(budget - totCal).toFixed(1);
 
   const calPct = Math.min((totCal / effectiveCeil) * 100, 100);
   const proPct = Math.min((totPro / cfg.proCeil) * 100, 100);
@@ -567,9 +576,9 @@ function renderToday() {
       '<div class="prog-wrap"><div class="prog-label"><span>Calories</span><span>' + totCal + ' / ' + effectiveCeil + '</span></div><div class="prog-bar"><div class="prog-fill" style="width:' + calPct + '%;background:' + calColor + '"></div></div></div>' +
       '<div class="prog-wrap"><div class="prog-label"><span>Protein</span><span>' + totPro + 'g / ' + cfg.proCeil + 'g</span></div><div class="prog-bar"><div class="prog-fill" style="width:' + proPct + '%;background:' + proColor + '"></div></div></div>' +
     '</div>' +
-    '<div class="card"><div class="card-title">Today\'s Max (' + W + '-day window)</div>' +
+    '<div class="card"><div class="card-title">Today\'s Max (' + W + '-day avg)</div>' +
       '<div style="font-size:22px;font-weight:700">' + (budget > 0 ? budget + ' kcal' : 'Over') + '</div>' +
-      '<div class="text-muted mt" style="font-size:12px">Needed to bring ' + W + '-day average to ' + effectiveCeil.toLocaleString() + '</div>' +
+      '<div class="text-muted mt" style="font-size:12px">Keeps ' + W + '-day average at ' + effectiveCeil.toLocaleString() + ' kcal</div>' +
     '</div>' +
     '<div class="card"><div class="card-title">Today\'s Meals <span class="dot-open"></span></div>' + mealsHTML + '</div>' +
     '<button class="btn btn-secondary mt" onclick="showScreen(\'log\',null)">+ Log a meal</button>';
@@ -759,25 +768,42 @@ function confirmLibLog() {
 function renderHistory() {
   const rows = historyDays.slice();
   if (rows.length === 0) { document.getElementById('history-body').innerHTML = '<tr><td colspan="4" class="spinner">No data yet.</td></tr>'; return; }
-  const last14 = rows.slice(-cfg.calWindow);
-  const last14ids = new Set(last14.map(d => d.id));
-  const avgCal = last14.reduce((s, d) => s + (d.calories || 0), 0) / last14.length;
-  const avgPro = last14.reduce((s, d) => s + (d.protein || 0), 0) / last14.length;
+
+  // Three tiers of row coloring:
+  // purple  = inside calorie rolling average window (most recent cfg.calWindow days)
+  // pink    = inside TDEE calc window but outside calorie window
+  // white   = older than both windows
+  const calWindowIds  = new Set(rows.slice(-cfg.calWindow).map(d => d.id));
+  const tdeeWindowIds = new Set(rows.slice(-cfg.tdeeCalcWindow).map(d => d.id));
+
+  const avgRows = rows.slice(-cfg.calWindow);
+  const avgCal = avgRows.reduce((s, d) => s + (d.calories || 0), 0) / (avgRows.length || 1);
+  const avgPro = avgRows.reduce((s, d) => s + (d.protein || 0), 0) / (avgRows.length || 1);
   const wN = todayWeight !== null ? todayWeight : (rows[rows.length-1].weight_kg || 0);
   const tdee = calcTDEE(rows, wN);
   const ffmi = calcFFMI(todayWeight, cfg.height, cfg.bodyFat);
+
   const summaryRow = '<tr class="summary-row"><td>TDEE: ' + tdee + ' kcal</td><td>' + (ffmi !== null ? 'FFMI: ' + ffmi : '-') + '</td><td>' + Math.round(avgCal) + '</td><td>' + Math.round(avgPro) + 'g</td></tr>';
   const todayRow = todayDay !== null && todayWeight !== null
     ? '<tr><td style="color:var(--accent)">Day ' + todayDay + ' &lt;</td><td style="color:var(--accent)">' + todayWeight + ' kg</td><td style="color:var(--muted)">-</td><td style="color:var(--muted)">-</td></tr>'
     : '';
+
   const dataRows = rows.slice().reverse().map(d => {
-    const p = last14ids.has(d.id) ? 'color:#8126ff' : '';
+    let color;
+    if (calWindowIds.has(d.id)) {
+      color = '#8126ff';           // purple — inside calorie rolling average
+    } else if (tdeeWindowIds.has(d.id)) {
+      color = 'var(--pink)';       // neon pink — inside TDEE window but not calorie window
+    } else {
+      color = 'var(--text)';       // white — outside both windows
+    }
     return '<tr>' +
-      '<td style="' + p + '">Day ' + d.id + '</td>' +
-      '<td style="' + p + '">' + (d.weight_kg ? d.weight_kg + ' kg' : '-') + '</td>' +
-      '<td style="' + p + '">' + (d.calories != null ? d.calories : '-') + '</td>' +
-      '<td style="' + p + '">' + (d.protein != null ? d.protein + 'g' : '-') + '</td></tr>';
+      '<td style="color:' + color + '">Day ' + d.id + '</td>' +
+      '<td style="color:' + color + '">' + (d.weight_kg ? d.weight_kg + ' kg' : '-') + '</td>' +
+      '<td style="color:' + color + '">' + (d.calories != null ? d.calories : '-') + '</td>' +
+      '<td style="color:' + color + '">' + (d.protein != null ? d.protein + 'g' : '-') + '</td></tr>';
   }).join('');
+
   document.getElementById('history-body').innerHTML = summaryRow + todayRow + dataRows;
 }
 
