@@ -432,15 +432,12 @@ function calcTDEE(rows, wN) {
 
 function getEffectiveCeil(tdeeVal) {
   if (cfg.autoAdjust && tdeeVal > 0) {
-    // Use rolling average of stored TDEE estimates if available
-    const estimates = historyDays.filter(d => d.tdee_estimate && d.tdee_estimate > 0).map(d => d.tdee_estimate);
-    if (estimates.length > 0) {
-      const window = estimates.slice(-21);
-      const avg = Math.round(window.reduce((s, v) => s + v, 0) / window.length);
-      return avg - cfg.deficit;
-    }
-    // Fall back to live TDEE if no stored estimates yet
-    return tdeeVal - cfg.deficit;
+    const stored = historyDays
+      .filter(d => d.tdee_estimate && d.tdee_estimate > 0)
+      .map(d => d.tdee_estimate);
+    const allEstimates = [...stored, tdeeVal].slice(-21);
+    const avg = Math.round(allEstimates.reduce((s, v) => s + v, 0) / allEstimates.length);
+    return avg - cfg.deficit;
   }
   return cfg.calCeil;
 }
