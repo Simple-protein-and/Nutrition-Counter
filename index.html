@@ -216,7 +216,14 @@
       <div class="mb"><label>Height (cm)</label><input type="number" id="s-height" placeholder="e.g. 184"></div>
       <div class="mb"><label>Body fat %</label><input type="number" id="s-bodyfat" step="0.1" placeholder="e.g. 18"></div>
 
-      <button class="btn btn-primary mt" onclick="saveSettings()">Save settings</button>
+      <hr class="settings-divider">
+      <div class="settings-section-label">Change password</div>
+      <div class="mb"><label>New password</label><input type="password" id="s-new-password" placeholder="at least 6 characters"></div>
+      <div class="mb"><label>Confirm new password</label><input type="password" id="s-confirm-password" placeholder="repeat new password"></div>
+      <button class="btn btn-secondary mb" onclick="changePassword()">Update password</button>
+
+      <hr class="settings-divider">
+      <button class="btn btn-primary" onclick="saveSettings()">Save settings</button>
     </div>
 
     <div class="card">
@@ -276,7 +283,7 @@
 const SUPABASE_URL = 'https://ujpffxdnvskzyojscsaa.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcGZmeGRudnNrenlvanNjc2FhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MTE0NDAsImV4cCI6MjA5NjA4NzQ0MH0.bGEOaKtiMqWW-ZufL99Uk_hJkuWlHkmx8Q-REhos_tc';
 const USDA_KEY = 'QchLTxDO9gwEsAbIEjwaXhrdqS22of1bFgrlMXoD';
-const VERSION = '0932.27.06';
+const VERSION = '0933.27.06';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const HISTORY_CAP = 50;
@@ -293,7 +300,7 @@ let libPending = null, managePending = null, usdaPending = null, currentUser = n
 let todayWeight = null;
 let authMode = 'login';
 
-// ─── AUTH ───────────────────────────────────────────────────────────────────
+// ─── AUTH ────────────────────────────────────────────────────────────────────
 
 function toggleAuthMode() {
   authMode = authMode === 'login' ? 'signup' : 'login';
@@ -316,8 +323,6 @@ async function submitAuth() {
   if (authMode === 'signup') {
     const { data, error } = await sb.auth.signUp({ email, password });
     if (error) { errEl.textContent = error.message; return; }
-    // Supabase may require email confirmation depending on your project settings.
-    // If confirmation is disabled, the session will be available immediately.
     if (data.session) {
       loginSuccess(data.session.user);
     } else {
@@ -348,7 +353,18 @@ async function logout() {
   document.getElementById('auth-password').value = '';
 }
 
-// Restore session on page load — Supabase handles this automatically via localStorage
+async function changePassword() {
+  const newPw = document.getElementById('s-new-password').value;
+  const confirmPw = document.getElementById('s-confirm-password').value;
+  if (!newPw || newPw.length < 6) { alert('Password must be at least 6 characters.'); return; }
+  if (newPw !== confirmPw) { alert('Passwords do not match.'); return; }
+  const { error } = await sb.auth.updateUser({ password: newPw });
+  if (error) { alert('Error: ' + error.message); return; }
+  document.getElementById('s-new-password').value = '';
+  document.getElementById('s-confirm-password').value = '';
+  alert('Password updated successfully.');
+}
+
 sb.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_IN' && session && !currentUser) {
     loginSuccess(session.user);
@@ -358,7 +374,7 @@ sb.auth.onAuthStateChange((event, session) => {
   }
 });
 
-// ─── NAV ────────────────────────────────────────────────────────────────────
+// ─── NAV ─────────────────────────────────────────────────────────────────────
 
 function showScreen(name, btn) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -382,7 +398,7 @@ function switchLogTab(tab, el) {
   }
 }
 
-// ─── SETTINGS ───────────────────────────────────────────────────────────────
+// ─── SETTINGS ────────────────────────────────────────────────────────────────
 
 async function loadSettings() {
   const { data } = await sb.from('settings').select('*').eq('user_id', currentUser.id);
@@ -445,7 +461,7 @@ async function saveSettings() {
   renderToday();
 }
 
-// ─── FFMI ───────────────────────────────────────────────────────────────────
+// ─── FFMI ────────────────────────────────────────────────────────────────────
 
 function calcFFMI(weightKg, heightCm, bodyFatPct) {
   if (!weightKg || !heightCm || !bodyFatPct) return null;
@@ -454,7 +470,7 @@ function calcFFMI(weightKg, heightCm, bodyFatPct) {
   return (lean / (hM * hM)).toFixed(1);
 }
 
-// ─── TDEE ───────────────────────────────────────────────────────────────────
+// ─── TDEE ────────────────────────────────────────────────────────────────────
 
 function calcTDEE(rows, wN) {
   const window = rows.slice(-cfg.tdeeCalcWindow);
@@ -477,7 +493,7 @@ function getEffectiveCeil(tdeeVal) {
   return cfg.calCeil;
 }
 
-// ─── DATA ───────────────────────────────────────────────────────────────────
+// ─── DATA ────────────────────────────────────────────────────────────────────
 
 async function loadHistory() {
   const { data } = await sb.from('days').select('*').eq('locked', true).eq('user_id', currentUser.id).order('id', { ascending: true });
@@ -529,7 +545,7 @@ async function submitWeighIn() {
   showScreen('today', document.querySelector('nav button'));
 }
 
-// ─── TODAY ───────────────────────────────────────────────────────────────────
+// ─── TODAY ────────────────────────────────────────────────────────────────────
 
 function renderToday() {
   const container = document.getElementById('today-summary');
@@ -594,7 +610,7 @@ function renderToday() {
   document.getElementById('alerts-container').innerHTML = alerts.map(a => '<div class="alert alert-' + a.type + '">' + a.msg + '</div>').join('');
 }
 
-// ─── MEALS ───────────────────────────────────────────────────────────────────
+// ─── MEALS ────────────────────────────────────────────────────────────────────
 
 async function addMeal(name, cal, pro, saveLib) {
   if (todayDay === null) { alert('Start a new day first via Log > New Day.'); return; }
@@ -635,7 +651,7 @@ function logManual() {
   document.getElementById('manual-save').checked = false;
 }
 
-// ─── USDA ────────────────────────────────────────────────────────────────────
+// ─── USDA ─────────────────────────────────────────────────────────────────────
 
 async function searchUSDA() {
   const q = document.getElementById('usda-query').value.trim();
@@ -691,7 +707,7 @@ function logUSDA() {
   usdaPending = null;
 }
 
-// ─── LIBRARY ─────────────────────────────────────────────────────────────────
+// ─── LIBRARY ──────────────────────────────────────────────────────────────────
 
 function renderLibrary() {
   const el = document.getElementById('library-list');
@@ -771,7 +787,7 @@ function confirmLibLog() {
   closeLibModal();
 }
 
-// ─── HISTORY ─────────────────────────────────────────────────────────────────
+// ─── HISTORY ──────────────────────────────────────────────────────────────────
 
 function renderHistory() {
   const rows = historyDays.slice();
@@ -811,7 +827,7 @@ function renderHistory() {
   document.getElementById('history-body').innerHTML = summaryRow + todayRow + dataRows;
 }
 
-// ─── INIT ────────────────────────────────────────────────────────────────────
+// ─── INIT ─────────────────────────────────────────────────────────────────────
 
 async function loadApp() {
   await loadSettings();
