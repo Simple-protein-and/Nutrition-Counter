@@ -92,7 +92,7 @@
   <div class="auth-box">
     <div class="auth-title" id="auth-title">Welcome back</div>
     <div class="auth-sub" id="auth-sub">Sign in to your account</div>
-    <div class="mb"><label>Username</label><input type="text" id="auth-username" placeholder="your username" autocomplete="username"></div>
+    <div class="mb"><label>Email</label><input type="email" id="auth-email" placeholder="you@example.com" autocomplete="email"></div>
     <div class="mb"><label>Password</label><input type="password" id="auth-password" placeholder="your password" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitAuth()"></div>
     <div class="auth-error" id="auth-error"></div>
     <button class="btn btn-primary mt" onclick="submitAuth()" id="auth-btn">Sign in</button>
@@ -206,10 +206,10 @@
       <div class="mb"><label>Fat loss ratio (%)</label><input type="number" id="s-fat-ratio" step="1" min="1" max="100"></div>
 
       <hr class="settings-divider">
-      <div class="settings-section-label">Rolling Windows</div>
-      <div class="mb"><label>Intake Average Window (days)</label><input type="number" id="s-cal-window" step="1" min="1" placeholder="14"></div>
-      <div class="mb"><label>TDEE calculation Window</label><input type="number" id="s-tdee-calc-window" step="1" min="1" placeholder="35"></div>
-      <div class="mb"><label>TDEE Average Window</label><input type="number" id="s-tdee-smooth-window" step="1" min="1" placeholder="21"></div>
+      <div class="settings-section-label">Rolling windows</div>
+      <div class="mb"><label>Calorie & protein rolling average window (days)</label><input type="number" id="s-cal-window" step="1" min="1" placeholder="14"></div>
+      <div class="mb"><label>TDEE calculation window (days) — how far back to look at calories + weight</label><input type="number" id="s-tdee-calc-window" step="1" min="1" placeholder="35"></div>
+      <div class="mb"><label>TDEE smoothing window — number of past daily TDEE estimates to average</label><input type="number" id="s-tdee-smooth-window" step="1" min="1" placeholder="21"></div>
 
       <hr class="settings-divider">
       <div class="settings-section-label">Body composition</div>
@@ -276,7 +276,7 @@
 const SUPABASE_URL = 'https://ujpffxdnvskzyojscsaa.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcGZmeGRudnNrenlvanNjc2FhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MTE0NDAsImV4cCI6MjA5NjA4NzQ0MH0.bGEOaKtiMqWW-ZufL99Uk_hJkuWlHkmx8Q-REhos_tc';
 const USDA_KEY = 'QchLTxDO9gwEsAbIEjwaXhrdqS22of1bFgrlMXoD';
-const VERSION = '0931.26.06';
+const VERSION = '0932.27.06';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const HISTORY_CAP = 50;
@@ -284,84 +284,82 @@ const HISTORY_CAP = 50;
 let cfg = {
   calCeil: 2500, proFloor: 88, proCeil: 168, fatRatio: 1.0,
   height: 0, bodyFat: 0, autoAdjust: false, deficit: 500,
-  calWindow: 14,        // rolling average window for calories/protein display + budget
-  tdeeCalcWindow: 35,   // how many days of history feed into calcTDEE()
-  tdeeSmoothWindow: 21  // how many stored daily TDEE estimates to average in getEffectiveCeil()
+  calWindow: 14,
+  tdeeCalcWindow: 35,
+  tdeeSmoothWindow: 21
 };
 let todayDay = null, todayMeals = [], historyDays = [], libMeals = [];
 let libPending = null, managePending = null, usdaPending = null, currentUser = null;
 let todayWeight = null;
 let authMode = 'login';
 
-// AUTH
+// ─── AUTH ───────────────────────────────────────────────────────────────────
+
 function toggleAuthMode() {
   authMode = authMode === 'login' ? 'signup' : 'login';
   const isLogin = authMode === 'login';
   document.getElementById('auth-title').textContent = isLogin ? 'Welcome back' : 'Create account';
-  document.getElementById('auth-sub').textContent = isLogin ? 'Sign in to your account' : 'Pick a username and password';
+  document.getElementById('auth-sub').textContent = isLogin ? 'Sign in to your account' : 'Pick an email and password';
   document.getElementById('auth-btn').textContent = isLogin ? 'Sign in' : 'Sign up';
   document.getElementById('auth-toggle-link').textContent = isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in';
   document.getElementById('auth-error').textContent = '';
 }
 
-async function hashPassword(pw) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
-}
-
 async function submitAuth() {
-  const username = document.getElementById('auth-username').value.trim().toLowerCase();
+  const email = document.getElementById('auth-email').value.trim().toLowerCase();
   const password = document.getElementById('auth-password').value;
   const errEl = document.getElementById('auth-error');
   errEl.textContent = '';
-  if (!username || !password) { errEl.textContent = 'Please fill in both fields.'; return; }
+  if (!email || !password) { errEl.textContent = 'Please fill in both fields.'; return; }
   if (password.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; return; }
-  const hash = await hashPassword(password);
+
   if (authMode === 'signup') {
-    const { data: existing } = await sb.from('users').select('id').eq('username', username).maybeSingle();
-    if (existing) { errEl.textContent = 'Username already taken.'; return; }
-    const { data, error } = await sb.from('users').insert({ username, password_hash: hash }).select().single();
-    if (error) { errEl.textContent = 'Error creating account.'; return; }
-    loginSuccess(data);
+    const { data, error } = await sb.auth.signUp({ email, password });
+    if (error) { errEl.textContent = error.message; return; }
+    // Supabase may require email confirmation depending on your project settings.
+    // If confirmation is disabled, the session will be available immediately.
+    if (data.session) {
+      loginSuccess(data.session.user);
+    } else {
+      errEl.textContent = 'Check your email to confirm your account, then sign in.';
+    }
   } else {
-    const { data, error } = await sb.from('users').select('*').eq('username', username).maybeSingle();
-    if (error || !data) { errEl.textContent = 'Username not found.'; return; }
-    if (data.password_hash !== hash) { errEl.textContent = 'Incorrect password.'; return; }
-    loginSuccess(data);
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) { errEl.textContent = error.message; return; }
+    loginSuccess(data.user);
   }
 }
 
 function loginSuccess(user) {
-  currentUser = { id: user.id, username: user.username };
-  localStorage.setItem('nt_user', JSON.stringify(currentUser));
+  currentUser = user;
   document.getElementById('auth-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
-  document.getElementById('settings-username').textContent = 'Signed in as: ' + user.username;
+  document.getElementById('settings-username').textContent = 'Signed in as: ' + user.email;
   document.getElementById('version-display').textContent = 'Version ' + VERSION;
   loadApp();
 }
 
-function logout() {
-  localStorage.removeItem('nt_user');
+async function logout() {
+  await sb.auth.signOut();
   currentUser = null; todayDay = null; todayMeals = []; historyDays = []; libMeals = []; todayWeight = null;
   document.getElementById('app').classList.add('hidden');
   document.getElementById('auth-screen').classList.remove('hidden');
-  document.getElementById('auth-username').value = '';
+  document.getElementById('auth-email').value = '';
   document.getElementById('auth-password').value = '';
 }
 
-function checkSavedLogin() {
-  const saved = localStorage.getItem('nt_user');
-  if (saved) {
-    try {
-      const user = JSON.parse(saved);
-      if (user.id && user.username) { loginSuccess(user); return true; }
-    } catch(e) {}
+// Restore session on page load — Supabase handles this automatically via localStorage
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_IN' && session && !currentUser) {
+    loginSuccess(session.user);
   }
-  return false;
-}
+  if (event === 'SIGNED_OUT') {
+    currentUser = null;
+  }
+});
 
-// NAV
+// ─── NAV ────────────────────────────────────────────────────────────────────
+
 function showScreen(name, btn) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
@@ -384,7 +382,8 @@ function switchLogTab(tab, el) {
   }
 }
 
-// SETTINGS
+// ─── SETTINGS ───────────────────────────────────────────────────────────────
+
 async function loadSettings() {
   const { data } = await sb.from('settings').select('*').eq('user_id', currentUser.id);
   if (!data) return;
@@ -420,32 +419,34 @@ async function saveSettings() {
   } else {
     cfg.calCeil = +document.getElementById('s-cal-ceil').value;
   }
-  cfg.proFloor    = +document.getElementById('s-pro-floor').value;
-  cfg.proCeil     = +document.getElementById('s-pro-ceil').value;
-  cfg.fatRatio    = +document.getElementById('s-fat-ratio').value / 100;
-  cfg.height      = +document.getElementById('s-height').value;
-  cfg.bodyFat     = +document.getElementById('s-bodyfat').value;
-  cfg.calWindow         = Math.max(1, +document.getElementById('s-cal-window').value || 14);
-  cfg.tdeeCalcWindow    = Math.max(1, +document.getElementById('s-tdee-calc-window').value || 35);
-  cfg.tdeeSmoothWindow  = Math.max(1, +document.getElementById('s-tdee-smooth-window').value || 21);
+  cfg.proFloor         = +document.getElementById('s-pro-floor').value;
+  cfg.proCeil          = +document.getElementById('s-pro-ceil').value;
+  cfg.fatRatio         = +document.getElementById('s-fat-ratio').value / 100;
+  cfg.height           = +document.getElementById('s-height').value;
+  cfg.bodyFat          = +document.getElementById('s-bodyfat').value;
+  cfg.calWindow        = Math.max(1, +document.getElementById('s-cal-window').value || 14);
+  cfg.tdeeCalcWindow   = Math.max(1, +document.getElementById('s-tdee-calc-window').value || 35);
+  cfg.tdeeSmoothWindow = Math.max(1, +document.getElementById('s-tdee-smooth-window').value || 21);
+
   await sb.from('settings').upsert([
-    { key: 'calCeil',           value: String(cfg.calCeil),           user_id: currentUser.id },
-    { key: 'proFloor',          value: String(cfg.proFloor),          user_id: currentUser.id },
-    { key: 'proCeil',           value: String(cfg.proCeil),           user_id: currentUser.id },
-    { key: 'fatRatio',          value: String(cfg.fatRatio),          user_id: currentUser.id },
-    { key: 'height',            value: String(cfg.height),            user_id: currentUser.id },
-    { key: 'bodyFat',           value: String(cfg.bodyFat),           user_id: currentUser.id },
-    { key: 'autoAdjust',        value: String(cfg.autoAdjust),        user_id: currentUser.id },
-    { key: 'deficit',           value: String(cfg.deficit),           user_id: currentUser.id },
-    { key: 'calWindow',         value: String(cfg.calWindow),         user_id: currentUser.id },
-    { key: 'tdeeCalcWindow',    value: String(cfg.tdeeCalcWindow),    user_id: currentUser.id },
-    { key: 'tdeeSmoothWindow',  value: String(cfg.tdeeSmoothWindow),  user_id: currentUser.id },
+    { key: 'calCeil',          value: String(cfg.calCeil),          user_id: currentUser.id },
+    { key: 'proFloor',         value: String(cfg.proFloor),         user_id: currentUser.id },
+    { key: 'proCeil',          value: String(cfg.proCeil),          user_id: currentUser.id },
+    { key: 'fatRatio',         value: String(cfg.fatRatio),         user_id: currentUser.id },
+    { key: 'height',           value: String(cfg.height),           user_id: currentUser.id },
+    { key: 'bodyFat',          value: String(cfg.bodyFat),          user_id: currentUser.id },
+    { key: 'autoAdjust',       value: String(cfg.autoAdjust),       user_id: currentUser.id },
+    { key: 'deficit',          value: String(cfg.deficit),          user_id: currentUser.id },
+    { key: 'calWindow',        value: String(cfg.calWindow),        user_id: currentUser.id },
+    { key: 'tdeeCalcWindow',   value: String(cfg.tdeeCalcWindow),   user_id: currentUser.id },
+    { key: 'tdeeSmoothWindow', value: String(cfg.tdeeSmoothWindow), user_id: currentUser.id },
   ], { onConflict: 'key,user_id' });
   alert('Settings saved.');
   renderToday();
 }
 
-// FFMI
+// ─── FFMI ───────────────────────────────────────────────────────────────────
+
 function calcFFMI(weightKg, heightCm, bodyFatPct) {
   if (!weightKg || !heightCm || !bodyFatPct) return null;
   const hM = heightCm / 100;
@@ -453,7 +454,8 @@ function calcFFMI(weightKg, heightCm, bodyFatPct) {
   return (lean / (hM * hM)).toFixed(1);
 }
 
-// TDEE — slices to cfg.tdeeCalcWindow before calculating
+// ─── TDEE ───────────────────────────────────────────────────────────────────
+
 function calcTDEE(rows, wN) {
   const window = rows.slice(-cfg.tdeeCalcWindow);
   if (window.length === 0) return 0;
@@ -475,7 +477,8 @@ function getEffectiveCeil(tdeeVal) {
   return cfg.calCeil;
 }
 
-// DATA
+// ─── DATA ───────────────────────────────────────────────────────────────────
+
 async function loadHistory() {
   const { data } = await sb.from('days').select('*').eq('locked', true).eq('user_id', currentUser.id).order('id', { ascending: true });
   historyDays = data || [];
@@ -498,7 +501,8 @@ async function detectOpenDay() {
   if (data) { todayDay = data.id; todayWeight = data.weight_kg; await loadTodayMeals(); }
 }
 
-// NEW DAY
+// ─── NEW DAY ─────────────────────────────────────────────────────────────────
+
 async function submitWeighIn() {
   const w = parseFloat(document.getElementById('newday-weight').value);
   if (!w) { alert('Please enter your weight.'); return; }
@@ -519,14 +523,14 @@ async function submitWeighIn() {
   const { error } = await sb.from('days').insert({ id: dayNum, date: today, weight_kg: w, calories: 0, protein: 0, locked: false, user_id: currentUser.id });
   if (error) { alert('Error: ' + error.message); return; }
   todayDay = dayNum; todayMeals = []; todayWeight = w;
-  // Prune anything beyond the 50-day hard cap
   await sb.from('days').delete().lt('id', dayNum - HISTORY_CAP).eq('user_id', currentUser.id);
   await loadHistory();
   document.getElementById('newday-weight').value = '';
   showScreen('today', document.querySelector('nav button'));
 }
 
-// TODAY
+// ─── TODAY ───────────────────────────────────────────────────────────────────
+
 function renderToday() {
   const container = document.getElementById('today-summary');
   const totCal = +todayMeals.reduce((s, m) => s + m.calories, 0).toFixed(1);
@@ -547,10 +551,10 @@ function renderToday() {
   const calColor = totCal >= effectiveCeil ? 'var(--red)' : 'var(--accent)';
   const proColor = totPro >= cfg.proCeil ? 'var(--red)' : totPro >= cfg.proFloor ? 'var(--green)' : 'var(--yellow)';
 
-  const remainingColor = remaining > 0 ? 'var(--accent)' : remainingToMax > 0 ? 'var(--yellow)' : 'var(--red)';
-  const remainingLabel = remaining > 0 ? 'kcal remaining' : remainingToMax > 0 ? 'kcal until daily max' : 'kcal over daily max';
+  const remainingColor   = remaining > 0 ? 'var(--accent)' : remainingToMax > 0 ? 'var(--yellow)' : 'var(--red)';
+  const remainingLabel   = remaining > 0 ? 'kcal remaining' : remainingToMax > 0 ? 'kcal until daily max' : 'kcal over daily max';
   const remainingDisplay = remaining > 0 ? remaining : remainingToMax > 0 ? remainingToMax : Math.abs(remainingToMax);
-    
+
   const mealsHTML = todayMeals.length === 0
     ? '<div class="text-muted">No meals logged yet.</div>'
     : todayMeals.map(m =>
@@ -578,7 +582,7 @@ function renderToday() {
     '</div>' +
     '<div class="card"><div class="card-title">Today\'s Max (' + W + '-day avg)</div>' +
       '<div style="font-size:22px;font-weight:700">' + (budget > 0 ? budget + ' kcal' : 'Over') + '</div>' +
-      '<div class="text-muted mt" style="font-size:12px">Stay under to keep average at ' + effectiveCeil.toLocaleString() + ' kcal</div>' +
+      '<div class="text-muted mt" style="font-size:12px">Keeps ' + W + '-day average at ' + effectiveCeil.toLocaleString() + ' kcal</div>' +
     '</div>' +
     '<div class="card"><div class="card-title">Today\'s Meals <span class="dot-open"></span></div>' + mealsHTML + '</div>' +
     '<button class="btn btn-secondary mt" onclick="showScreen(\'log\',null)">+ Log a meal</button>';
@@ -590,7 +594,8 @@ function renderToday() {
   document.getElementById('alerts-container').innerHTML = alerts.map(a => '<div class="alert alert-' + a.type + '">' + a.msg + '</div>').join('');
 }
 
-// MEALS
+// ─── MEALS ───────────────────────────────────────────────────────────────────
+
 async function addMeal(name, cal, pro, saveLib) {
   if (todayDay === null) { alert('Start a new day first via Log > New Day.'); return; }
   cal = +parseFloat(cal).toFixed(1);
@@ -630,7 +635,8 @@ function logManual() {
   document.getElementById('manual-save').checked = false;
 }
 
-// USDA
+// ─── USDA ────────────────────────────────────────────────────────────────────
+
 async function searchUSDA() {
   const q = document.getElementById('usda-query').value.trim();
   if (!q) return;
@@ -685,7 +691,8 @@ function logUSDA() {
   usdaPending = null;
 }
 
-// LIBRARY
+// ─── LIBRARY ─────────────────────────────────────────────────────────────────
+
 function renderLibrary() {
   const el = document.getElementById('library-list');
   const q = (document.getElementById('library-search') ? document.getElementById('library-search').value : '').toLowerCase();
@@ -764,15 +771,12 @@ function confirmLibLog() {
   closeLibModal();
 }
 
-// HISTORY
+// ─── HISTORY ─────────────────────────────────────────────────────────────────
+
 function renderHistory() {
   const rows = historyDays.slice();
   if (rows.length === 0) { document.getElementById('history-body').innerHTML = '<tr><td colspan="4" class="spinner">No data yet.</td></tr>'; return; }
 
-  // Three tiers of row coloring:
-  // purple  = inside calorie rolling average window (most recent cfg.calWindow days)
-  // pink    = inside TDEE calc window but outside calorie window
-  // white   = older than both windows
   const calWindowIds  = new Set(rows.slice(-cfg.calWindow).map(d => d.id));
   const tdeeWindowIds = new Set(rows.slice(-cfg.tdeeCalcWindow).map(d => d.id));
 
@@ -791,11 +795,11 @@ function renderHistory() {
   const dataRows = rows.slice().reverse().map(d => {
     let color;
     if (calWindowIds.has(d.id)) {
-      color = '#8126ff';           // purple — inside calorie rolling average
+      color = '#8126ff';
     } else if (tdeeWindowIds.has(d.id)) {
-      color = 'var(--pink)';       // neon pink — inside TDEE window but not calorie window
+      color = 'var(--pink)';
     } else {
-      color = 'var(--text)';       // white — outside both windows
+      color = 'var(--text)';
     }
     return '<tr>' +
       '<td style="color:' + color + '">Day ' + d.id + '</td>' +
@@ -807,7 +811,8 @@ function renderHistory() {
   document.getElementById('history-body').innerHTML = summaryRow + todayRow + dataRows;
 }
 
-// INIT
+// ─── INIT ────────────────────────────────────────────────────────────────────
+
 async function loadApp() {
   await loadSettings();
   await loadHistory();
@@ -815,8 +820,6 @@ async function loadApp() {
   await loadLibrary();
   renderToday();
 }
-
-checkSavedLogin();
 </script>
 </body>
 </html>
