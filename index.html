@@ -49,6 +49,7 @@
   td { padding: 10px 8px; text-align: right; border-bottom: 1px solid var(--border); }
   td:first-child { text-align: left; }
   tr.summary-row td { background: var(--surface2); font-weight: 700; font-size: 13px; color: var(--accent); border-top: 2px solid var(--accent); }
+  tr.today-row td { background: var(--surface2); font-weight: 600; font-size: 13px; color: var(--accent); border-bottom: 2px solid var(--border); }
   .dot-open { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-left: 4px; vertical-align: middle; }
   .meal-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
   .meal-item:last-child { border-bottom: none; }
@@ -283,7 +284,7 @@
 const SUPABASE_URL = 'https://ujpffxdnvskzyojscsaa.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcGZmeGRudnNrenlvanNjc2FhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MTE0NDAsImV4cCI6MjA5NjA4NzQ0MH0.bGEOaKtiMqWW-ZufL99Uk_hJkuWlHkmx8Q-REhos_tc';
 const USDA_KEY = 'QchLTxDO9gwEsAbIEjwaXhrdqS22of1bFgrlMXoD';
-const VERSION = '0933.27.06';
+const VERSION = '0934.27.06';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const HISTORY_CAP = 50;
@@ -491,6 +492,14 @@ function getEffectiveCeil(tdeeVal) {
     return avg - cfg.deficit;
   }
   return cfg.calCeil;
+}
+
+function calcTDEEAvg(currentTDEE) {
+  const stored = historyDays
+    .filter(d => d.tdee_estimate && d.tdee_estimate > 0)
+    .map(d => d.tdee_estimate);
+  const allEstimates = [...stored, currentTDEE].slice(-cfg.tdeeSmoothWindow);
+  return Math.round(allEstimates.reduce((s, v) => s + v, 0) / allEstimates.length);
 }
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
@@ -800,12 +809,30 @@ function renderHistory() {
   const avgCal = avgRows.reduce((s, d) => s + (d.calories || 0), 0) / (avgRows.length || 1);
   const avgPro = avgRows.reduce((s, d) => s + (d.protein || 0), 0) / (avgRows.length || 1);
   const wN = todayWeight !== null ? todayWeight : (rows[rows.length-1].weight_kg || 0);
-  const tdee = calcTDEE(rows, wN);
+
+  // Latest single TDEE estimate
+  const latestTDEE = calcTDEE(rows, wN);
+  // Smoothed TDEE average (the number actually driving the ceiling)
+  const tdeeAvg = calcTDEEAvg(latestTDEE);
   const ffmi = calcFFMI(todayWeight, cfg.height, cfg.bodyFat);
 
-  const summaryRow = '<tr class="summary-row"><td>TDEE: ' + tdee + ' kcal</td><td>' + (ffmi !== null ? 'FFMI: ' + ffmi : '-') + '</td><td>' + Math.round(avgCal) + '</td><td>' + Math.round(avgPro) + 'g</td></tr>';
+  // Averages row: smoothed TDEE avg | — | avg kcal | avg protein
+  const summaryRow =
+    '<tr class="summary-row">' +
+      '<td>TDEE avg: ' + tdeeAvg + ' kcal</td>' +
+      '<td>—</td>' +
+      '<td>' + Math.round(avgCal) + '</td>' +
+      '<td>' + Math.round(avgPro) + 'g</td>' +
+    '</tr>';
+
+  // Today row: Today | weight (FFMI) | latest single TDEE estimate | —
   const todayRow = todayDay !== null && todayWeight !== null
-    ? '<tr><td style="color:var(--accent)">Day ' + todayDay + ' &lt;</td><td style="color:var(--accent)">' + todayWeight + ' kg</td><td style="color:var(--muted)">-</td><td style="color:var(--muted)">-</td></tr>'
+    ? '<tr class="today-row">' +
+        '<td>Today</td>' +
+        '<td>' + todayWeight + ' kg' + (ffmi !== null ? ' · ' + ffmi + ' FFMI' : '') + '</td>' +
+        '<td>' + latestTDEE + ' kcal</td>' +
+        '<td>—</td>' +
+      '</tr>'
     : '';
 
   const dataRows = rows.slice().reverse().map(d => {
