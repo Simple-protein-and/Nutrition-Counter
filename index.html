@@ -284,7 +284,7 @@
 const SUPABASE_URL = 'https://ujpffxdnvskzyojscsaa.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcGZmeGRudnNrenlvanNjc2FhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MTE0NDAsImV4cCI6MjA5NjA4NzQ0MH0.bGEOaKtiMqWW-ZufL99Uk_hJkuWlHkmx8Q-REhos_tc';
 const USDA_KEY = 'QchLTxDO9gwEsAbIEjwaXhrdqS22of1bFgrlMXoD';
-const VERSION = '0934.27.06';
+const VERSION = '0935.01.07';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const HISTORY_CAP = 50;
@@ -810,28 +810,24 @@ function renderHistory() {
   const avgPro = avgRows.reduce((s, d) => s + (d.protein || 0), 0) / (avgRows.length || 1);
   const wN = todayWeight !== null ? todayWeight : (rows[rows.length-1].weight_kg || 0);
 
-  // Latest single TDEE estimate
   const latestTDEE = calcTDEE(rows, wN);
-  // Smoothed TDEE average (the number actually driving the ceiling)
   const tdeeAvg = calcTDEEAvg(latestTDEE);
   const ffmi = calcFFMI(todayWeight, cfg.height, cfg.bodyFat);
 
-  // Averages row: smoothed TDEE avg | — | avg kcal | avg protein
   const summaryRow =
     '<tr class="summary-row">' +
-      '<td>TDEE avg: ' + tdeeAvg + ' kcal</td>' +
-      '<td>—</td>' +
+      '<td>Averages</td>' +
+      '<td>TDEE: ' + tdeeAvg + '</td>' +
       '<td>' + Math.round(avgCal) + '</td>' +
       '<td>' + Math.round(avgPro) + 'g</td>' +
     '</tr>';
 
-  // Today row: Today | weight (FFMI) | latest single TDEE estimate | —
   const todayRow = todayDay !== null && todayWeight !== null
     ? '<tr class="today-row">' +
         '<td>Today</td>' +
-        '<td>' + todayWeight + ' kg' + (ffmi !== null ? ' · ' + ffmi + ' FFMI' : '') + '</td>' +
-        '<td>' + latestTDEE + ' kcal</td>' +
-        '<td>—</td>' +
+        '<td>' + todayWeight + ' kg</td>' +
+        '<td>TDEE: ' + latestTDEE + '</td>' +
+        '<td>' + (ffmi !== null ? ffmi + ' FFMI' : '—') + '</td>' +
       '</tr>'
     : '';
 
@@ -846,9 +842,10 @@ function renderHistory() {
     }
     return '<tr>' +
       '<td style="color:' + color + '">Day ' + d.id + '</td>' +
-      '<td style="color:' + color + '">' + (d.weight_kg ? d.weight_kg + ' kg' : '-') + '</td>' +
-      '<td style="color:' + color + '">' + (d.calories != null ? d.calories : '-') + '</td>' +
-      '<td style="color:' + color + '">' + (d.protein != null ? d.protein + 'g' : '-') + '</td></tr>';
+      '<td style="color:' + color + '">' + (d.weight_kg ? d.weight_kg + ' kg' : '—') + '</td>' +
+      '<td style="color:' + color + '">' + (d.calories != null ? d.calories : '—') + '</td>' +
+      '<td style="color:' + color + '">' + (d.protein != null ? d.protein + 'g' : '—') + '</td>' +
+    '</tr>';
   }).join('');
 
   document.getElementById('history-body').innerHTML = summaryRow + todayRow + dataRows;
