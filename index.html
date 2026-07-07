@@ -284,7 +284,7 @@
 const SUPABASE_URL = 'https://ujpffxdnvskzyojscsaa.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcGZmeGRudnNrenlvanNjc2FhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MTE0NDAsImV4cCI6MjA5NjA4NzQ0MH0.bGEOaKtiMqWW-ZufL99Uk_hJkuWlHkmx8Q-REhos_tc';
 const USDA_KEY = 'QchLTxDO9gwEsAbIEjwaXhrdqS22of1bFgrlMXoD';
-const VERSION = '0935.01.07';
+const VERSION = '0935.01.08';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const HISTORY_CAP = 50;
@@ -472,14 +472,61 @@ function calcFFMI(weightKg, heightCm, bodyFatPct) {
 }
 
 // ─── TDEE ────────────────────────────────────────────────────────────────────
+//
+// Weight offset scheme (relative to "today" = the most recent weigh-in, whether
+// that's today's actual weight or the new weight just entered when locking a day):
+//   day 5 = today            day 4 = yesterday         day 3 = target/end day (T_end)
+//   day 2 = T_end - 1        day 1 = T_end - 2 (= today - 4)
+//
+// T_end is always "the day before yesterday" — we can't use today itself as the
+// end of the TDEE window because its 5-day smoothed weight would need two days
+// that haven't happened yet.
+//
+// - Each "point" weight (start day and end day of the TDEE window) is replaced
+//   with the average of the 5 calendar days centered on it (2 before, 2 after).
+// - The calorie sum only counts days from the start day through T_end (inclusive) —
+//   i.e. it stops two days short of today, to match T_end being treated as "today"
+//   for this calculation.
 
 function calcTDEE(rows, wN) {
-  const window = rows.slice(-cfg.tdeeCalcWindow);
-  if (window.length === 0) return 0;
-  const w0 = window[0].weight_kg || 0;
-  const kgLost = Math.max(0, w0 - wN);
-  const totalCal = window.reduce((s, d) => s + (d.calories || 0), 0);
-  return Math.round((totalCal + kgLost * cfg.fatRatio * 7700) / window.length);
+  if (rows.length === 0) return 0;
+
+  // Map of day id -> weight, built from locked history plus a pseudo "current"
+  // day (one id past the last locked day) holding the just-entered weight wN.
+  const weightMap = new Map();
+  rows.forEach(d => weightMap.set(d.id, d.weight_kg || 0));
+  const currentId = rows[rows.length - 1].id + 1;
+  weightMap.set(currentId, wN || 0);
+
+  function smoothedWeight(dayId) {
+    const vals = [];
+    for (let d = dayId - 2; d <= dayId + 2; d++) {
+      if (weightMap.has(d)) vals.push(weightMap.get(d));
+    }
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  }
+
+  const endDay = currentId - 2; // T_end = day before yesterday
+  let startDay = endDay - (cfg.tdeeCalcWindow - 1);
+  startDay = Math.max(startDay, rows[0].id); // don't reach before available history
+
+  const wStart = smoothedWeight(startDay);
+  const wEnd = smoothedWeight(endDay);
+  const kgLost = Math.max(0, wStart - wEnd);
+
+  // Calories only count through the day BEFORE T_end: food eaten on T_end itself
+  // happens after T_end's morning weigh-in, so it hasn't fed into any weight
+  // change yet and shouldn't be attributed to this window.
+  let totalCal = 0, dayCount = 0;
+  rows.forEach(d => {
+    if (d.id >= startDay && d.id <= endDay - 1) {
+      totalCal += d.calories || 0;
+      dayCount++;
+    }
+  });
+  if (dayCount === 0) return 0;
+
+  return Math.round((totalCal + kgLost * cfg.fatRatio * 7700) / dayCount);
 }
 
 function getEffectiveCeil(tdeeVal) {
