@@ -11,6 +11,8 @@
     --yellow: #ffb300; --red: #f44336; --radius: 10px;
     --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --pink: #ff4dc4;
+    --protein-bar-below-floor: #4caf50;
+    --protein-bar-above-floor: #ff4dc4;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
@@ -712,8 +714,8 @@ function renderToday() {
     '<div class="card"><div class="card-title">Progress</div>' +
       '<div class="prog-wrap"><div class="prog-label"><span>Calories</span><span>' + totCal + ' / ' + effectiveCeil + '</span></div><div class="prog-bar"><div class="prog-fill" style="width:' + calPct + '%;background:' + calColor + '"></div></div></div>' +
       '<div class="prog-wrap"><div class="prog-label"><span>Protein</span><span>' + totPro + 'g / ' + proCeilG + 'g</span></div><div class="prog-bar">' +
-        '<div class="prog-fill" style="position:absolute;left:0;top:0;width:' + proBluePct + '%;background:var(--accent)"></div>' +
-        '<div class="prog-fill" style="position:absolute;left:' + proBluePct + '%;top:0;width:' + proRedPct + '%;background:var(--red)"></div>' +
+        '<div class="prog-fill" style="position:absolute;left:0;top:0;width:' + proBluePct + '%;background:var(--protein-bar-below-floor)"></div>' +
+        '<div class="prog-fill" style="position:absolute;left:' + proBluePct + '%;top:0;width:' + proRedPct + '%;background:var(--protein-bar-above-floor)"></div>' +
       '</div></div>' +
     '</div>' +
     '<div class="card"><div class="card-title">Today\'s Max (' + W + '-day avg)</div>' +
