@@ -298,7 +298,7 @@
 const SUPABASE_URL = 'https://ujpffxdnvskzyojscsaa.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcGZmeGRudnNrenlvanNjc2FhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MTE0NDAsImV4cCI6MjA5NjA4NzQ0MH0.bGEOaKtiMqWW-ZufL99Uk_hJkuWlHkmx8Q-REhos_tc';
 const USDA_KEY = 'QchLTxDO9gwEsAbIEjwaXhrdqS22of1bFgrlMXoD';
-const VERSION = '0935.01.09';
+const VERSION = '0848.09.21';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const HISTORY_CAP = 50;
@@ -665,12 +665,16 @@ function calcTDEE(rows, wN) {
   }
 
   const endDay = currentId - 2; // T_end = day before yesterday
-  let startDay = endDay - (cfg.tdeeCalcWindow - 1);
+  // The window setting is N full days back from the end day, so N=35 counts
+  // 35 days of eating (the start day's morning weigh-in through the end day's).
+  let startDay = endDay - cfg.tdeeCalcWindow;
   startDay = Math.max(startDay, rows[0].id); // don't reach before available history
 
   const wStart = smoothedWeight(startDay);
   const wEnd = smoothedWeight(endDay);
-  const kgLost = Math.max(0, wStart - wEnd);
+  // Positive = weight lost (adds energy the body supplied), negative = weight
+  // gained (subtracts energy that was stored instead of burned).
+  const kgLost = wStart - wEnd;
 
   // Calories only count through the day BEFORE T_end: food eaten on T_end itself
   // happens after T_end's morning weigh-in, so it hasn't fed into any weight
@@ -751,7 +755,9 @@ async function submitWeighIn() {
     if (todayDay !== null) {
       const totalCal = todayMeals.reduce((s, m) => s + m.calories, 0);
       const totalPro = todayMeals.reduce((s, m) => s + m.protein, 0);
-      const tdeeEst = calcTDEE(historyDays, w);
+      // Same inputs as the live number on the Today screen: history through the
+      // previous day plus THIS day's morning weight (not the new day's weight).
+      const tdeeEst = calcTDEE(historyDays, todayWeight);
       const { error: lockErr } = await sb.from('days').update({
         calories: Math.round(totalCal),
         protein: Math.round(totalPro),
