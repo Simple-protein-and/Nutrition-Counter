@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nutrition Tracker</title>
 <style>
   :root {
@@ -16,6 +16,10 @@
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
+  button { font-family: var(--font); }
+  button:focus-visible, .tab:focus-visible, .search-item:focus-visible, input:focus-visible, select:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
   nav { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; }
   nav button { flex: 1; padding: 14px 4px; background: none; border: none; color: var(--muted); font-size: 12px; cursor: pointer; border-bottom: 2px solid transparent; transition: all .2s; }
   nav button.active { color: var(--accent); border-bottom-color: var(--accent); }
@@ -28,6 +32,7 @@
   label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
   .btn { display: block; width: 100%; padding: 13px; border-radius: 8px; border: none; font-size: 16px; font-weight: 600; cursor: pointer; transition: opacity .2s; }
   .btn:active { opacity: .7; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
   .btn-primary { background: var(--accent); color: #fff; }
   .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
   .btn-danger { background: var(--red); color: #fff; }
@@ -82,7 +87,7 @@
   .auth-title { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
   .auth-sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
   .auth-toggle { text-align: center; margin-top: 16px; font-size: 14px; color: var(--muted); }
-  .auth-toggle span { color: var(--accent); cursor: pointer; }
+  .auth-toggle button { background: none; border: none; color: var(--accent); cursor: pointer; font-size: inherit; }
   .auth-error { color: var(--red); font-size: 13px; margin-top: 8px; min-height: 18px; }
   .settings-divider { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
   .settings-section-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; margin-top: 4px; }
@@ -95,21 +100,21 @@
   <div class="auth-box">
     <div class="auth-title" id="auth-title">Welcome back</div>
     <div class="auth-sub" id="auth-sub">Sign in to your account</div>
-    <div class="mb"><label>Email</label><input type="email" id="auth-email" placeholder="you@example.com" autocomplete="email"></div>
-    <div class="mb"><label>Password</label><input type="password" id="auth-password" placeholder="your password" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitAuth()"></div>
-    <div class="auth-error" id="auth-error"></div>
+    <div class="mb"><label for="auth-email">Email</label><input type="email" id="auth-email" placeholder="you@example.com" autocomplete="email"></div>
+    <div class="mb"><label for="auth-password">Password</label><input type="password" id="auth-password" placeholder="your password" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitAuth()"></div>
+    <div class="auth-error" id="auth-error" role="alert"></div>
     <button class="btn btn-primary mt" onclick="submitAuth()" id="auth-btn">Sign in</button>
-    <div class="auth-toggle"><span id="auth-toggle-link" onclick="toggleAuthMode()">Don't have an account? Sign up</span></div>
+    <div class="auth-toggle"><button type="button" id="auth-toggle-link" onclick="toggleAuthMode()">Don't have an account? Sign up</button></div>
   </div>
 </div>
 
 <!-- MAIN APP -->
 <div id="app" class="hidden">
-  <nav>
-    <button class="active" onclick="showScreen('today',this)">Today</button>
-    <button onclick="showScreen('log',this)">Log</button>
-    <button onclick="showScreen('history',this)">History</button>
-    <button onclick="showScreen('settings',this)">Settings</button>
+  <nav aria-label="Main">
+    <button class="active" data-screen="today" aria-current="page" onclick="showScreen('today')">Today</button>
+    <button data-screen="log" onclick="showScreen('log')">Log</button>
+    <button data-screen="history" onclick="showScreen('history')">History</button>
+    <button data-screen="settings" onclick="showScreen('settings')">Settings</button>
   </nav>
 
   <div id="screen-today" class="screen active">
@@ -118,19 +123,19 @@
   </div>
 
   <div id="screen-log" class="screen">
-    <div class="tab-row">
-      <div class="tab active" onclick="switchLogTab('manual',this)">Manual</div>
-      <div class="tab" onclick="switchLogTab('search',this)">USDA Search</div>
-      <div class="tab" onclick="switchLogTab('library',this)">Library</div>
-      <div class="tab" onclick="switchLogTab('newday',this)" style="color:var(--yellow)">New Day</div>
+    <div class="tab-row" role="tablist" aria-label="Log method">
+      <button type="button" class="tab active" role="tab" aria-selected="true" data-tab="manual" onclick="switchLogTab('manual',this)">Manual</button>
+      <button type="button" class="tab" role="tab" aria-selected="false" data-tab="search" onclick="switchLogTab('search',this)">USDA Search</button>
+      <button type="button" class="tab" role="tab" aria-selected="false" data-tab="library" onclick="switchLogTab('library',this)">Library</button>
+      <button type="button" class="tab" role="tab" aria-selected="false" data-tab="newday" onclick="switchLogTab('newday',this)" style="color:var(--yellow)">New Day</button>
     </div>
-    <div id="log-manual">
+    <div id="log-manual" role="tabpanel">
       <div class="card">
         <div class="card-title">Manual entry</div>
-        <div class="mb"><label>Meal name (optional)</label><input type="text" id="manual-name" placeholder="e.g. Hanamaru udon"></div>
+        <div class="mb"><label for="manual-name">Meal name (optional)</label><input type="text" id="manual-name" placeholder="e.g. Hanamaru udon"></div>
         <div class="row mb">
-          <div><label>Calories (kcal)</label><input type="number" id="manual-cal" step="0.1" placeholder="0"></div>
-          <div><label>Protein (g)</label><input type="number" id="manual-pro" step="0.1" placeholder="0"></div>
+          <div><label for="manual-cal">Calories (kcal)</label><input type="number" id="manual-cal" step="0.1" placeholder="0"></div>
+          <div><label for="manual-pro">Protein (g)</label><input type="number" id="manual-pro" step="0.1" placeholder="0"></div>
         </div>
         <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text);margin-bottom:12px">
           <input type="checkbox" id="manual-save" style="width:auto"> Save to library
@@ -138,11 +143,11 @@
         <button class="btn btn-primary" onclick="logManual()">Add to today</button>
       </div>
     </div>
-    <div id="log-search" class="hidden">
+    <div id="log-search" class="hidden" role="tabpanel">
       <div class="card">
         <div class="card-title">USDA FoodData Central</div>
         <div class="row mb">
-          <input type="text" id="usda-query" placeholder="Search food..." onkeydown="if(event.key==='Enter')searchUSDA()">
+          <input type="text" id="usda-query" aria-label="Search food" placeholder="Search food..." onkeydown="if(event.key==='Enter')searchUSDA()">
           <button class="btn btn-primary btn-sm" onclick="searchUSDA()" style="flex:0 0 70px">Go</button>
         </div>
         <div id="usda-results"></div>
@@ -151,12 +156,12 @@
         <div class="card-title">Confirm & adjust</div>
         <div id="usda-confirm-name" style="font-weight:600;margin-bottom:10px"></div>
         <div class="row mb">
-          <div><label>Serving size (g)</label><input type="number" id="usda-serving" step="1" placeholder="100" oninput="recalcUSDA()"></div>
-          <div><label>Reference size (g)</label><input type="number" id="usda-ref" step="1" disabled></div>
+          <div><label for="usda-serving">Serving size (g)</label><input type="number" id="usda-serving" step="1" placeholder="100" oninput="recalcUSDA()"></div>
+          <div><label for="usda-ref">Reference size (g)</label><input type="number" id="usda-ref" step="1" disabled></div>
         </div>
         <div class="row mb">
-          <div><label>Calories</label><input type="number" id="usda-final-cal" step="0.1"></div>
-          <div><label>Protein (g)</label><input type="number" id="usda-final-pro" step="0.1"></div>
+          <div><label for="usda-final-cal">Calories</label><input type="number" id="usda-final-cal" step="0.1"></div>
+          <div><label for="usda-final-pro">Protein (g)</label><input type="number" id="usda-final-pro" step="0.1"></div>
         </div>
         <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text);margin-bottom:12px">
           <input type="checkbox" id="usda-save" style="width:auto"> Save to library
@@ -164,20 +169,20 @@
         <button class="btn btn-primary" onclick="logUSDA()">Add to today</button>
       </div>
     </div>
-    <div id="log-library" class="hidden">
+    <div id="log-library" class="hidden" role="tabpanel">
       <div class="card">
         <div class="card-title">Saved meals</div>
-        <input type="text" id="library-search" placeholder="Search saved meals..." oninput="renderLibrary()" style="margin-bottom:12px">
+        <input type="text" id="library-search" aria-label="Search saved meals" placeholder="Search saved meals..." oninput="renderLibrary()" style="margin-bottom:12px">
         <div id="library-list"><div class="text-muted">No saved meals yet.</div></div>
       </div>
     </div>
-    <div id="log-newday" class="hidden">
+    <div id="log-newday" class="hidden" role="tabpanel">
       <div class="card">
         <div class="card-title">New Day</div>
         <div class="text-muted mb" style="font-size:13px">Locks today into history and opens a fresh day.</div>
-        <div class="mb"><label>Morning weight (kg)</label><input type="number" id="newday-weight" step="0.1" placeholder="e.g. 90.4"></div>
+        <div class="mb"><label for="newday-weight">Morning weight (kg)</label><input type="number" id="newday-weight" step="0.1" placeholder="e.g. 90.4"></div>
         <div class="text-muted mb" id="newday-label" style="font-size:13px"></div>
-        <button class="btn btn-primary" onclick="submitWeighIn()">Lock in & start new day</button>
+        <button class="btn btn-primary" id="newday-btn" onclick="submitWeighIn()">Lock in & start new day</button>
       </div>
     </div>
   </div>
@@ -199,37 +204,37 @@
       <div class="card-title">Settings</div>
 
       <div class="settings-section-label">Targets</div>
-      <div class="mb"><label>Calorie ceiling (kcal) — or deficit if auto-adjust is on</label><input type="number" id="s-cal-ceil"></div>
+      <div class="mb"><label for="s-cal-ceil" id="s-cal-ceil-label">Calorie ceiling</label><input type="number" id="s-cal-ceil"></div>
       <div class="mb" style="display:flex;align-items:center;gap:10px">
-        <input type="checkbox" id="s-auto-adjust" style="width:auto;margin:0">
-        <label style="margin:0;font-size:14px;color:var(--text)">Auto-adjust (TDEE minus above value)</label>
+        <input type="checkbox" id="s-auto-adjust" style="width:auto;margin:0" onchange="onAutoAdjustToggle()">
+        <label for="s-auto-adjust" style="margin:0;font-size:14px;color:var(--text)">Auto-adjust (TDEE minus deficit)</label>
       </div>
       <div class="mb">
-        <label>Protein target mode</label>
+        <label for="s-pro-mode">Protein target mode</label>
         <select id="s-pro-mode" onchange="updateProModeLabels()">
           <option value="direct">Direct (g/day)</option>
           <option value="perkg">g per kg lean mass</option>
         </select>
       </div>
-      <div class="mb"><label id="s-pro-floor-label">Protein floor (g)</label><input type="number" id="s-pro-floor" step="0.1"></div>
-      <div class="mb"><label id="s-pro-ceil-label">Protein ceiling (g)</label><input type="number" id="s-pro-ceil" step="0.1"></div>
-      <div class="mb"><label>Fat loss ratio (%)</label><input type="number" id="s-fat-ratio" step="1" min="1" max="100"></div>
+      <div class="mb"><label id="s-pro-floor-label" for="s-pro-floor">Protein floor (g)</label><input type="number" id="s-pro-floor" step="0.1"></div>
+      <div class="mb"><label id="s-pro-ceil-label" for="s-pro-ceil">Protein ceiling (g)</label><input type="number" id="s-pro-ceil" step="0.1"></div>
+      <div class="mb"><label for="s-fat-ratio">Fat loss ratio (%)</label><input type="number" id="s-fat-ratio" step="1" min="1" max="100"></div>
 
       <hr class="settings-divider">
       <div class="settings-section-label">Rolling windows</div>
-      <div class="mb"><label>Calorie & protein rolling average window (days)</label><input type="number" id="s-cal-window" step="1" min="1" placeholder="14"></div>
-      <div class="mb"><label>TDEE calculation window (days) — how far back to look at calories + weight</label><input type="number" id="s-tdee-calc-window" step="1" min="1" placeholder="35"></div>
-      <div class="mb"><label>TDEE smoothing window — number of past daily TDEE estimates to average</label><input type="number" id="s-tdee-smooth-window" step="1" min="1" placeholder="21"></div>
+      <div class="mb"><label for="s-cal-window">Calorie & protein rolling average window (days)</label><input type="number" id="s-cal-window" step="1" min="1" placeholder="14"></div>
+      <div class="mb"><label for="s-tdee-calc-window">TDEE calculation window (days) — how far back to look at calories + weight</label><input type="number" id="s-tdee-calc-window" step="1" min="1" placeholder="35"></div>
+      <div class="mb"><label for="s-tdee-smooth-window">TDEE smoothing window — number of past daily TDEE estimates to average</label><input type="number" id="s-tdee-smooth-window" step="1" min="1" placeholder="21"></div>
 
       <hr class="settings-divider">
       <div class="settings-section-label">Body composition</div>
-      <div class="mb"><label>Height (cm)</label><input type="number" id="s-height" placeholder="e.g. 184"></div>
-      <div class="mb"><label>Body fat %</label><input type="number" id="s-bodyfat" step="0.1" placeholder="e.g. 18"></div>
+      <div class="mb"><label for="s-height">Height (cm)</label><input type="number" id="s-height" placeholder="e.g. 184"></div>
+      <div class="mb"><label for="s-bodyfat">Body fat %</label><input type="number" id="s-bodyfat" step="0.1" placeholder="e.g. 18"></div>
 
       <hr class="settings-divider">
       <div class="settings-section-label">Change password</div>
-      <div class="mb"><label>New password</label><input type="password" id="s-new-password" placeholder="at least 6 characters"></div>
-      <div class="mb"><label>Confirm new password</label><input type="password" id="s-confirm-password" placeholder="repeat new password"></div>
+      <div class="mb"><label for="s-new-password">New password</label><input type="password" id="s-new-password" placeholder="at least 6 characters" autocomplete="new-password"></div>
+      <div class="mb"><label for="s-confirm-password">Confirm new password</label><input type="password" id="s-confirm-password" placeholder="repeat new password" autocomplete="new-password"></div>
       <button class="btn btn-secondary mb" onclick="changePassword()">Update password</button>
 
       <hr class="settings-divider">
@@ -250,8 +255,8 @@
 
 <!-- MANAGE MODAL -->
 <div class="modal-overlay hidden" id="manage-modal">
-  <div class="modal">
-    <button class="modal-close" onclick="closeManageModal()">x</button>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="manage-modal-title">
+    <button class="modal-close" aria-label="Close" onclick="closeManageModal()">x</button>
     <div class="modal-title" id="manage-modal-title"></div>
     <div id="manage-modal-macros" class="text-muted mb" style="font-size:14px"></div>
     <button class="btn btn-secondary mt" onclick="openEditModal()">Edit</button>
@@ -262,13 +267,13 @@
 
 <!-- EDIT MODAL -->
 <div class="modal-overlay hidden" id="edit-modal">
-  <div class="modal">
-    <button class="modal-close" onclick="closeEditModal()">x</button>
-    <div class="modal-title">Edit meal</div>
-    <div class="mb"><label>Meal name</label><input type="text" id="edit-name"></div>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-modal-title">
+    <button class="modal-close" aria-label="Close" onclick="closeEditModal()">x</button>
+    <div class="modal-title" id="edit-modal-title">Edit meal</div>
+    <div class="mb"><label for="edit-name">Meal name</label><input type="text" id="edit-name"></div>
     <div class="row mb">
-      <div><label>Calories</label><input type="number" id="edit-cal" step="0.1"></div>
-      <div><label>Protein (g)</label><input type="number" id="edit-pro" step="0.1"></div>
+      <div><label for="edit-cal">Calories</label><input type="number" id="edit-cal" step="0.1"></div>
+      <div><label for="edit-pro">Protein (g)</label><input type="number" id="edit-pro" step="0.1"></div>
     </div>
     <button class="btn btn-primary mt" onclick="saveEditLibItem()">Save</button>
   </div>
@@ -276,11 +281,11 @@
 
 <!-- LIBRARY LOG MODAL -->
 <div class="modal-overlay hidden" id="lib-modal">
-  <div class="modal">
-    <button class="modal-close" onclick="closeLibModal()">x</button>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="lib-modal-title">
+    <button class="modal-close" aria-label="Close" onclick="closeLibModal()">x</button>
     <div class="modal-title" id="lib-modal-title"></div>
     <div id="lib-modal-macros" class="text-muted mb" style="font-size:14px"></div>
-    <label>Portion %</label>
+    <label for="pct-input">Portion %</label>
     <input type="number" id="pct-input" min="1" max="200" value="100" oninput="updatePctDisplay()" style="margin:10px 0">
     <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
     <div id="lib-modal-adjusted" style="font-size:15px;font-weight:600;margin-bottom:16px"></div>
@@ -288,15 +293,16 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script>
 const SUPABASE_URL = 'https://ujpffxdnvskzyojscsaa.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcGZmeGRudnNrenlvanNjc2FhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MTE0NDAsImV4cCI6MjA5NjA4NzQ0MH0.bGEOaKtiMqWW-ZufL99Uk_hJkuWlHkmx8Q-REhos_tc';
 const USDA_KEY = 'QchLTxDO9gwEsAbIEjwaXhrdqS22of1bFgrlMXoD';
-const VERSION = '0935.01.08';
+const VERSION = '0935.01.09';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const HISTORY_CAP = 50;
+const KJ_PER_KCAL = 4.184;
 
 let cfg = {
   calCeil: 2500, proMode: 'direct', proFloor: 88, proCeil: 168, fatRatio: 1.0,
@@ -307,8 +313,75 @@ let cfg = {
 };
 let todayDay = null, todayMeals = [], historyDays = [], libMeals = [];
 let libPending = null, managePending = null, usdaPending = null, currentUser = null;
+let usdaResults = [];
 let todayWeight = null;
 let authMode = 'login';
+let weighInBusy = false;
+
+// The ceiling/deficit box is one input shared by two stored values. These hold
+// each mode's value while the form is open, so toggling auto-adjust swaps the
+// box contents instead of reinterpreting the same number.
+let formCeil = 0, formDeficit = 0;
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+// IDs come back from the DOM as strings; compare as strings so it works for
+// both UUID and numeric primary keys.
+function findById(list, id) {
+  return list.find(x => String(x.id) === String(id));
+}
+
+function reportError(context, error) {
+  console.error(context, error);
+  alert(context + ': ' + ((error && error.message) || error));
+}
+
+// ─── MODALS (focus handling, Escape, Tab trap) ───────────────────────────────
+
+let lastFocus = null;
+const MODAL_CLOSERS = {
+  'manage-modal': () => closeManageModal(),
+  'edit-modal': () => closeEditModal(),
+  'lib-modal': () => closeLibModal()
+};
+
+function showModal(id) {
+  const m = document.getElementById(id);
+  if (!lastFocus) lastFocus = document.activeElement;
+  m.classList.remove('hidden');
+  const first = m.querySelector('input:not([disabled]), .btn');
+  if (first) first.focus();
+}
+
+function hideModal(id, restoreFocus = true) {
+  document.getElementById(id).classList.add('hidden');
+  if (restoreFocus && lastFocus && document.body.contains(lastFocus)) lastFocus.focus();
+  if (restoreFocus) lastFocus = null;
+}
+
+function openModalId() {
+  return Object.keys(MODAL_CLOSERS).find(id => !document.getElementById(id).classList.contains('hidden'));
+}
+
+document.addEventListener('keydown', e => {
+  const id = openModalId();
+  if (!id) return;
+  if (e.key === 'Escape') { e.preventDefault(); MODAL_CLOSERS[id](); return; }
+  if (e.key === 'Tab') {
+    const focusables = [...document.getElementById(id).querySelectorAll('button, input:not([disabled]), select, [tabindex]:not([tabindex="-1"])')]
+      .filter(el => el.offsetParent !== null);
+    if (focusables.length === 0) return;
+    const first = focusables[0], last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+});
 
 // ─── AUTH ────────────────────────────────────────────────────────────────────
 
@@ -319,6 +392,7 @@ function toggleAuthMode() {
   document.getElementById('auth-sub').textContent = isLogin ? 'Sign in to your account' : 'Pick an email and password';
   document.getElementById('auth-btn').textContent = isLogin ? 'Sign in' : 'Sign up';
   document.getElementById('auth-toggle-link').textContent = isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in';
+  document.getElementById('auth-password').autocomplete = isLogin ? 'current-password' : 'new-password';
   document.getElementById('auth-error').textContent = '';
 }
 
@@ -346,6 +420,7 @@ async function submitAuth() {
 }
 
 function loginSuccess(user) {
+  if (currentUser) return;
   currentUser = user;
   document.getElementById('auth-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
@@ -354,13 +429,17 @@ function loginSuccess(user) {
   loadApp();
 }
 
-async function logout() {
-  await sb.auth.signOut();
+function showAuthScreen() {
   currentUser = null; todayDay = null; todayMeals = []; historyDays = []; libMeals = []; todayWeight = null;
   document.getElementById('app').classList.add('hidden');
   document.getElementById('auth-screen').classList.remove('hidden');
   document.getElementById('auth-email').value = '';
   document.getElementById('auth-password').value = '';
+}
+
+async function logout() {
+  await sb.auth.signOut();
+  showAuthScreen();
 }
 
 async function changePassword() {
@@ -375,29 +454,32 @@ async function changePassword() {
   alert('Password updated successfully.');
 }
 
-sb.auth.onAuthStateChange((event, session) => {
-  if (event === 'SIGNED_IN' && session && !currentUser) {
-    loginSuccess(session.user);
-  }
-  if (event === 'SIGNED_OUT') {
-    currentUser = null;
-  }
+// Session restore happens in init() via getSession(). The listener only handles
+// the session ending (expired, or signed out in another tab).
+sb.auth.onAuthStateChange((event) => {
+  if (event === 'SIGNED_OUT' && currentUser) showAuthScreen();
 });
 
 // ─── NAV ─────────────────────────────────────────────────────────────────────
 
-function showScreen(name, btn) {
+function showScreen(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => {
+    const active = b.dataset.screen === name;
+    b.classList.toggle('active', active);
+    if (active) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  });
   document.getElementById('screen-' + name).classList.add('active');
-  if (btn) btn.classList.add('active');
   if (name === 'history') renderHistory();
   if (name === 'today') renderToday();
 }
 
 function switchLogTab(tab, el) {
-  document.querySelectorAll('#screen-log .tab').forEach(t => t.classList.remove('active'));
-  if (el) el.classList.add('active');
+  document.querySelectorAll('#screen-log .tab').forEach(t => {
+    const active = t.dataset.tab === tab;
+    t.classList.toggle('active', active);
+    t.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
   ['manual','search','library','newday'].forEach(t => document.getElementById('log-'+t).classList.add('hidden'));
   document.getElementById('log-'+tab).classList.remove('hidden');
   if (tab === 'library') renderLibrary();
@@ -448,8 +530,29 @@ function updateProModeLabels() {
   }
 }
 
+function updateCalModeLabel() {
+  const auto = document.getElementById('s-auto-adjust').checked;
+  document.getElementById('s-cal-ceil-label').textContent = auto ? 'Daily deficit' : 'Calorie ceiling';
+}
+
+function onAutoAdjustToggle() {
+  const auto = document.getElementById('s-auto-adjust').checked;
+  const box = document.getElementById('s-cal-ceil');
+  // The box still holds the previous mode's value: stash it, then show the
+  // value belonging to the newly selected mode.
+  if (auto) {
+    formCeil = +box.value;
+    box.value = formDeficit;
+  } else {
+    formDeficit = +box.value;
+    box.value = formCeil;
+  }
+  updateCalModeLabel();
+}
+
 async function loadSettings() {
-  const { data } = await sb.from('settings').select('*').eq('user_id', currentUser.id);
+  const { data, error } = await sb.from('settings').select('*').eq('user_id', currentUser.id);
+  if (error) { reportError('Could not load settings', error); return; }
   if (!data) return;
   data.forEach(r => {
     if (r.key === 'calCeil') cfg.calCeil = +r.value;
@@ -465,8 +568,11 @@ async function loadSettings() {
     if (r.key === 'tdeeCalcWindow') cfg.tdeeCalcWindow = +r.value;
     if (r.key === 'tdeeSmoothWindow') cfg.tdeeSmoothWindow = +r.value;
   });
-  document.getElementById('s-cal-ceil').value = cfg.autoAdjust ? cfg.deficit : cfg.calCeil;
+  formCeil = cfg.calCeil;
+  formDeficit = cfg.deficit;
+  document.getElementById('s-cal-ceil').value = cfg.autoAdjust ? formDeficit : formCeil;
   document.getElementById('s-auto-adjust').checked = cfg.autoAdjust;
+  updateCalModeLabel();
   document.getElementById('s-pro-mode').value = cfg.proMode;
   document.getElementById('s-pro-floor').value = cfg.proFloor;
   document.getElementById('s-pro-ceil').value = cfg.proCeil;
@@ -481,11 +587,10 @@ async function loadSettings() {
 
 async function saveSettings() {
   cfg.autoAdjust = document.getElementById('s-auto-adjust').checked;
-  if (cfg.autoAdjust) {
-    cfg.deficit = +document.getElementById('s-cal-ceil').value;
-  } else {
-    cfg.calCeil = +document.getElementById('s-cal-ceil').value;
-  }
+  const boxVal = +document.getElementById('s-cal-ceil').value;
+  if (cfg.autoAdjust) formDeficit = boxVal; else formCeil = boxVal;
+  cfg.calCeil = formCeil;
+  cfg.deficit = formDeficit;
   cfg.proMode          = document.getElementById('s-pro-mode').value === 'perkg' ? 'perkg' : 'direct';
   cfg.proFloor          = +document.getElementById('s-pro-floor').value;
   cfg.proCeil           = +document.getElementById('s-pro-ceil').value;
@@ -496,7 +601,7 @@ async function saveSettings() {
   cfg.tdeeCalcWindow   = Math.max(1, +document.getElementById('s-tdee-calc-window').value || 35);
   cfg.tdeeSmoothWindow = Math.max(1, +document.getElementById('s-tdee-smooth-window').value || 21);
 
-  await sb.from('settings').upsert([
+  const { error } = await sb.from('settings').upsert([
     { key: 'calCeil',          value: String(cfg.calCeil),          user_id: currentUser.id },
     { key: 'proMode',          value: String(cfg.proMode),          user_id: currentUser.id },
     { key: 'proFloor',         value: String(cfg.proFloor),         user_id: currentUser.id },
@@ -510,6 +615,7 @@ async function saveSettings() {
     { key: 'tdeeCalcWindow',   value: String(cfg.tdeeCalcWindow),   user_id: currentUser.id },
     { key: 'tdeeSmoothWindow', value: String(cfg.tdeeSmoothWindow), user_id: currentUser.id },
   ], { onConflict: 'key,user_id' });
+  if (error) { reportError('Settings were not saved', error); return; }
   alert('Settings saved.');
   renderToday();
 }
@@ -581,18 +687,9 @@ function calcTDEE(rows, wN) {
   return Math.round((totalCal + kgLost * cfg.fatRatio * 7700) / dayCount);
 }
 
-function getEffectiveCeil(tdeeVal) {
-  if (cfg.autoAdjust && tdeeVal > 0) {
-    const stored = historyDays
-      .filter(d => d.tdee_estimate && d.tdee_estimate > 0)
-      .map(d => d.tdee_estimate);
-    const allEstimates = [...stored, tdeeVal].slice(-cfg.tdeeSmoothWindow);
-    const avg = Math.round(allEstimates.reduce((s, v) => s + v, 0) / allEstimates.length);
-    return avg - cfg.deficit;
-  }
-  return cfg.calCeil;
-}
-
+// Average of the stored daily TDEE estimates plus the current one, over the
+// smoothing window. Single source of truth for both the history summary and
+// the auto-adjusted calorie ceiling.
 function calcTDEEAvg(currentTDEE) {
   const stored = historyDays
     .filter(d => d.tdee_estimate && d.tdee_estimate > 0)
@@ -601,56 +698,98 @@ function calcTDEEAvg(currentTDEE) {
   return Math.round(allEstimates.reduce((s, v) => s + v, 0) / allEstimates.length);
 }
 
+function getEffectiveCeil(tdeeVal) {
+  if (cfg.autoAdjust && tdeeVal > 0) return calcTDEEAvg(tdeeVal) - cfg.deficit;
+  return cfg.calCeil;
+}
+
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
 async function loadHistory() {
-  const { data } = await sb.from('days').select('*').eq('locked', true).eq('user_id', currentUser.id).order('id', { ascending: true });
+  const { data, error } = await sb.from('days').select('*').eq('locked', true).eq('user_id', currentUser.id).order('id', { ascending: true });
+  if (error) { reportError('Could not load history', error); return; }
   historyDays = data || [];
   if (historyDays.length > HISTORY_CAP) historyDays = historyDays.slice(-HISTORY_CAP);
 }
 
 async function loadTodayMeals() {
   if (!todayDay) return;
-  const { data } = await sb.from('meals_today').select('*').eq('day_id', todayDay).eq('user_id', currentUser.id).order('logged_at', { ascending: true });
+  const { data, error } = await sb.from('meals_today').select('*').eq('day_id', todayDay).eq('user_id', currentUser.id).order('logged_at', { ascending: true });
+  if (error) { reportError('Could not load today\'s meals', error); return; }
   todayMeals = data || [];
 }
 
 async function loadLibrary() {
-  const { data } = await sb.from('library').select('*').eq('user_id', currentUser.id).order('name', { ascending: true });
+  const { data, error } = await sb.from('library').select('*').eq('user_id', currentUser.id).order('name', { ascending: true });
+  if (error) { reportError('Could not load library', error); return; }
   libMeals = data || [];
 }
 
 async function detectOpenDay() {
-  const { data } = await sb.from('days').select('*').eq('locked', false).eq('user_id', currentUser.id).maybeSingle();
+  const { data, error } = await sb.from('days').select('*').eq('locked', false).eq('user_id', currentUser.id).maybeSingle();
+  if (error) { reportError('Could not load the open day', error); return; }
   if (data) { todayDay = data.id; todayWeight = data.weight_kg; await loadTodayMeals(); }
 }
 
 // ─── NEW DAY ─────────────────────────────────────────────────────────────────
 
 async function submitWeighIn() {
+  if (weighInBusy) return;
   const w = parseFloat(document.getElementById('newday-weight').value);
   if (!w) { alert('Please enter your weight.'); return; }
-  const maxDay = historyDays.length > 0 ? Math.max(...historyDays.map(d => d.id)) : 0;
-  const dayNum = todayDay !== null ? todayDay + 1 : maxDay + 1;
-  if (todayDay !== null) {
-    const totalCal = todayMeals.reduce((s, m) => s + m.calories, 0);
-    const totalPro = todayMeals.reduce((s, m) => s + m.protein, 0);
-    const tdeeEst = calcTDEE(historyDays, w);
-    await sb.from('days').update({
-      calories: Math.round(totalCal),
-      protein: Math.round(totalPro),
-      locked: true,
-      tdee_estimate: tdeeEst
-    }).eq('id', todayDay).eq('user_id', currentUser.id);
+
+  const btn = document.getElementById('newday-btn');
+  weighInBusy = true;
+  btn.disabled = true;
+  let lockedToday = false;
+
+  try {
+    const maxDay = historyDays.length > 0 ? Math.max(...historyDays.map(d => d.id)) : 0;
+    const dayNum = todayDay !== null ? todayDay + 1 : maxDay + 1;
+
+    // Step 1: lock the current open day (if there is one).
+    if (todayDay !== null) {
+      const totalCal = todayMeals.reduce((s, m) => s + m.calories, 0);
+      const totalPro = todayMeals.reduce((s, m) => s + m.protein, 0);
+      const tdeeEst = calcTDEE(historyDays, w);
+      const { error: lockErr } = await sb.from('days').update({
+        calories: Math.round(totalCal),
+        protein: Math.round(totalPro),
+        locked: true,
+        tdee_estimate: tdeeEst
+      }).eq('id', todayDay).eq('user_id', currentUser.id);
+      if (lockErr) { reportError('Could not lock today. Nothing was changed', lockErr); return; }
+      lockedToday = true;
+    }
+
+    // Step 2: open the new day. If this fails, put today back the way it was so
+    // the app is never left with no open day.
+    const today = new Date().toISOString().split('T')[0];
+    const { error: insertErr } = await sb.from('days').insert({ id: dayNum, date: today, weight_kg: w, calories: 0, protein: 0, locked: false, user_id: currentUser.id });
+    if (insertErr) {
+      if (lockedToday) {
+        const { error: undoErr } = await sb.from('days').update({ locked: false }).eq('id', todayDay).eq('user_id', currentUser.id);
+        if (undoErr) {
+          reportError('Could not open the new day, and today could not be unlocked automatically. Please reload the app and check the days table', undoErr);
+          return;
+        }
+      }
+      reportError('Could not start the new day. Today was left open', insertErr);
+      return;
+    }
+
+    todayDay = dayNum; todayMeals = []; todayWeight = w;
+
+    const { error: pruneErr } = await sb.from('days').delete().lt('id', dayNum - HISTORY_CAP).eq('user_id', currentUser.id);
+    if (pruneErr) console.error('Could not prune old days', pruneErr);
+
+    await loadHistory();
+    document.getElementById('newday-weight').value = '';
+    showScreen('today');
+  } finally {
+    weighInBusy = false;
+    btn.disabled = false;
   }
-  const today = new Date().toISOString().split('T')[0];
-  const { error } = await sb.from('days').insert({ id: dayNum, date: today, weight_kg: w, calories: 0, protein: 0, locked: false, user_id: currentUser.id });
-  if (error) { alert('Error: ' + error.message); return; }
-  todayDay = dayNum; todayMeals = []; todayWeight = w;
-  await sb.from('days').delete().lt('id', dayNum - HISTORY_CAP).eq('user_id', currentUser.id);
-  await loadHistory();
-  document.getElementById('newday-weight').value = '';
-  showScreen('today', document.querySelector('nav button'));
 }
 
 // ─── TODAY ────────────────────────────────────────────────────────────────────
@@ -677,14 +816,14 @@ function renderToday() {
   const calPct = Math.min((totCal / effectiveCeil) * 100, 100);
   const calColor = totCal >= effectiveCeil ? 'var(--red)' : 'var(--accent)';
 
-  // Two-tone protein bar: blue from 0 -> floor, red from floor -> ceiling.
+  // Two-tone protein bar: green from 0 -> floor, pink from floor -> ceiling.
   // Both segments are scaled against the ceiling so the bar's total width still
-  // represents "0 to ceiling", same as before.
+  // represents "0 to ceiling".
   const safeProCeil = proCeilG > 0 ? proCeilG : 1;
   const filledToFloor = Math.min(totPro, proFloorG);
   const filledPastFloor = Math.max(0, Math.min(totPro, proCeilG) - proFloorG);
-  const proBluePct = Math.min((filledToFloor / safeProCeil) * 100, 100);
-  const proRedPct = Math.min((filledPastFloor / safeProCeil) * 100, 100 - proBluePct);
+  const proBelowFloorPct = Math.min((filledToFloor / safeProCeil) * 100, 100);
+  const proAboveFloorPct = Math.min((filledPastFloor / safeProCeil) * 100, 100 - proBelowFloorPct);
 
   const remainingColor   = remaining > 0 ? 'var(--accent)' : remainingToMax > 0 ? 'var(--yellow)' : 'var(--red)';
   const remainingLabel   = remaining > 0 ? 'kcal remaining' : remainingToMax > 0 ? 'kcal until daily max' : 'kcal over daily max';
@@ -694,10 +833,10 @@ function renderToday() {
     ? '<div class="text-muted">No meals logged yet.</div>'
     : todayMeals.map(m =>
         '<div class="meal-item">' +
-          '<div><div class="meal-name">' + (m.name || 'Meal') + '</div><div class="meal-macros">' + m.calories + ' kcal · ' + m.protein + 'g protein</div></div>' +
+          '<div><div class="meal-name">' + esc(m.name || 'Meal') + '</div><div class="meal-macros">' + esc(m.calories) + ' kcal · ' + esc(m.protein) + 'g protein</div></div>' +
           '<div style="display:flex;align-items:center;gap:6px">' +
-            '<button class="btn btn-secondary btn-sm" onclick="repeatMeal(\'' + m.id + '\')">+1</button>' +
-            '<button class="meal-del" onclick="deleteMeal(\'' + m.id + '\')">&#215;</button>' +
+            '<button class="btn btn-secondary btn-sm" data-action="repeat" data-id="' + esc(m.id) + '" aria-label="Add another ' + esc(m.name || 'meal') + '">+1</button>' +
+            '<button class="meal-del" data-action="delete" data-id="' + esc(m.id) + '" aria-label="Delete ' + esc(m.name || 'meal') + '">&#215;</button>' +
           '</div>' +
         '</div>'
       ).join('');
@@ -714,8 +853,8 @@ function renderToday() {
     '<div class="card"><div class="card-title">Progress</div>' +
       '<div class="prog-wrap"><div class="prog-label"><span>Calories</span><span>' + totCal + ' / ' + effectiveCeil + '</span></div><div class="prog-bar"><div class="prog-fill" style="width:' + calPct + '%;background:' + calColor + '"></div></div></div>' +
       '<div class="prog-wrap"><div class="prog-label"><span>Protein</span><span>' + totPro + 'g / ' + proCeilG + 'g</span></div><div class="prog-bar">' +
-        '<div class="prog-fill" style="position:absolute;left:0;top:0;width:' + proBluePct + '%;background:var(--protein-bar-below-floor)"></div>' +
-        '<div class="prog-fill" style="position:absolute;left:' + proBluePct + '%;top:0;width:' + proRedPct + '%;background:var(--protein-bar-above-floor)"></div>' +
+        '<div class="prog-fill" style="position:absolute;left:0;top:0;width:' + proBelowFloorPct + '%;background:var(--protein-bar-below-floor)"></div>' +
+        '<div class="prog-fill" style="position:absolute;left:' + proBelowFloorPct + '%;top:0;width:' + proAboveFloorPct + '%;background:var(--protein-bar-above-floor)"></div>' +
       '</div></div>' +
     '</div>' +
     '<div class="card"><div class="card-title">Today\'s Max (' + W + '-day avg)</div>' +
@@ -723,7 +862,7 @@ function renderToday() {
       '<div class="text-muted mt" style="font-size:12px">Keeps ' + W + '-day average at ' + effectiveCeil.toLocaleString() + ' kcal</div>' +
     '</div>' +
     '<div class="card"><div class="card-title">Today\'s Meals <span class="dot-open"></span></div>' + mealsHTML + '</div>' +
-    '<button class="btn btn-secondary mt" onclick="showScreen(\'log\',null)">+ Log a meal</button>';
+    '<button class="btn btn-secondary mt" onclick="showScreen(\'log\')">+ Log a meal</button>';
 
   const alerts = [];
   if (totCal >= effectiveCeil) alerts.push({ type: 'red', msg: 'Calorie ceiling hit (' + effectiveCeil + ' kcal)' });
@@ -742,20 +881,24 @@ async function addMeal(name, cal, pro, saveLib) {
   if (error) { alert('Error: ' + error.message); return; }
   todayMeals.push(data);
   if (saveLib) {
-    await sb.from('library').upsert({ name, calories: cal, protein: pro, user_id: currentUser.id }, { onConflict: 'name,user_id' });
-    await loadLibrary();
+    const { error: libErr } = await sb.from('library').upsert({ name, calories: cal, protein: pro, user_id: currentUser.id }, { onConflict: 'name,user_id' });
+    if (libErr) reportError('Meal was logged, but could not be saved to the library', libErr);
+    else await loadLibrary();
   }
   renderToday();
 }
 
 async function deleteMeal(id) {
-  await sb.from('meals_today').delete().eq('id', id).eq('user_id', currentUser.id);
-  todayMeals = todayMeals.filter(m => m.id !== id);
+  const meal = findById(todayMeals, id);
+  if (!meal) return;
+  const { error } = await sb.from('meals_today').delete().eq('id', meal.id).eq('user_id', currentUser.id);
+  if (error) { reportError('Could not delete the meal', error); return; }
+  todayMeals = todayMeals.filter(m => m !== meal);
   renderToday();
 }
 
 async function repeatMeal(id) {
-  const m = todayMeals.find(m => m.id === id);
+  const m = findById(todayMeals, id);
   if (!m) return;
   await addMeal(m.name, m.calories, m.protein, false);
 }
@@ -775,11 +918,41 @@ function logManual() {
 
 // ─── USDA ─────────────────────────────────────────────────────────────────────
 
+// USDA lists energy in more than one unit for some foods (kcal and kJ). Prefer
+// the kcal entry; only fall back to kJ (converted) if no kcal entry exists.
+function extractEnergyKcal(nutrients) {
+  const isKcal = n => /^kcal$/i.test(n.unitName || '');
+  const isKj = n => /^kj$/i.test(n.unitName || '');
+  const isEnergy = n => /energy/i.test(n.nutrientName || '');
+
+  const kcal =
+    nutrients.find(n => n.nutrientId === 1008) ||
+    nutrients.find(n => String(n.nutrientNumber) === '208') ||
+    nutrients.find(n => isEnergy(n) && isKcal(n));
+  if (kcal) return +kcal.value || 0;
+
+  const kj =
+    nutrients.find(n => n.nutrientId === 1062) ||
+    nutrients.find(n => isEnergy(n) && isKj(n));
+  if (kj) return (+kj.value || 0) / KJ_PER_KCAL;
+
+  return 0;
+}
+
+function extractProtein(nutrients) {
+  const p =
+    nutrients.find(n => n.nutrientId === 1003) ||
+    nutrients.find(n => String(n.nutrientNumber) === '203') ||
+    nutrients.find(n => /^protein$/i.test(n.nutrientName || ''));
+  return p ? (+p.value || 0) : 0;
+}
+
 async function searchUSDA() {
   const q = document.getElementById('usda-query').value.trim();
   if (!q) return;
   document.getElementById('usda-results').innerHTML = '<div class="spinner">Searching...</div>';
   document.getElementById('usda-confirm-card').classList.add('hidden');
+  usdaResults = [];
   const url = 'https://api.nal.usda.gov/fdc/v1/foods/search?query=' + encodeURIComponent(q) + '&pageSize=8&dataType=SR%20Legacy,Survey%20(FNDDS),Foundation&api_key=' + USDA_KEY;
   for (let i = 1; i <= 3; i++) {
     try {
@@ -789,14 +962,15 @@ async function searchUSDA() {
       const data = await res.json();
       const foods = data.foods || [];
       if (foods.length === 0) { document.getElementById('usda-results').innerHTML = '<div class="text-muted">No results found.</div>'; return; }
-      document.getElementById('usda-results').innerHTML = foods.map(f => {
-        const cN = (f.foodNutrients || []).find(n => n.nutrientId === 1008 || (n.nutrientName && n.nutrientName.includes('Energy')));
-        const pN = (f.foodNutrients || []).find(n => n.nutrientId === 1003 || (n.nutrientName && n.nutrientName.includes('Protein')));
-        const cv = cN ? cN.value : 0; const pv = pN ? pN.value : 0;
-        return '<div class="search-item" onclick=\'selectUSDA(' + JSON.stringify({ name: f.description, cal: cv, pro: pv }) + ')\'>' +
-          '<div class="search-item-name">' + f.description + '</div>' +
-          '<div class="search-item-detail">' + Math.round(cv) + ' kcal · ' + pv + 'g protein per 100g</div></div>';
-      }).join('');
+      usdaResults = foods.map(f => {
+        const nutrients = f.foodNutrients || [];
+        return { name: f.description, cal: extractEnergyKcal(nutrients), pro: extractProtein(nutrients) };
+      });
+      document.getElementById('usda-results').innerHTML = usdaResults.map((f, idx) =>
+        '<div class="search-item" role="button" tabindex="0" data-idx="' + idx + '">' +
+          '<div class="search-item-name">' + esc(f.name) + '</div>' +
+          '<div class="search-item-detail">' + Math.round(f.cal) + ' kcal · ' + +f.pro.toFixed(1) + 'g protein per 100g</div></div>'
+      ).join('');
       return;
     } catch(e) { /* retry */ }
   }
@@ -827,6 +1001,7 @@ function logUSDA() {
   document.getElementById('usda-results').innerHTML = '';
   document.getElementById('usda-query').value = '';
   usdaPending = null;
+  usdaResults = [];
 }
 
 // ─── LIBRARY ──────────────────────────────────────────────────────────────────
@@ -838,28 +1013,30 @@ function renderLibrary() {
   if (filtered.length === 0) { el.innerHTML = '<div class="text-muted">' + (libMeals.length === 0 ? 'No saved meals yet.' : 'No matches.') + '</div>'; return; }
   el.innerHTML = filtered.map(m =>
     '<div class="meal-item">' +
-      '<div><div class="meal-name">' + m.name + '</div><div class="meal-macros">' + m.calories + ' kcal · ' + m.protein + 'g protein</div></div>' +
+      '<div><div class="meal-name">' + esc(m.name) + '</div><div class="meal-macros">' + esc(m.calories) + ' kcal · ' + esc(m.protein) + 'g protein</div></div>' +
       '<div style="display:flex;gap:6px;align-items:center">' +
-        '<button class="btn btn-primary btn-sm" onclick="openLibModal(\'' + m.id + '\')">Log</button>' +
-        '<button class="btn btn-secondary btn-sm" onclick="manageLibItem(\'' + m.id + '\')">...</button>' +
+        '<button class="btn btn-primary btn-sm" data-action="lib-log" data-id="' + esc(m.id) + '" aria-label="Log ' + esc(m.name) + '">Log</button>' +
+        '<button class="btn btn-secondary btn-sm" data-action="lib-manage" data-id="' + esc(m.id) + '" aria-label="Manage ' + esc(m.name) + '">...</button>' +
       '</div></div>'
   ).join('');
 }
 
 function manageLibItem(id) {
-  managePending = libMeals.find(m => m.id === id);
+  managePending = findById(libMeals, id);
   if (!managePending) return;
   document.getElementById('manage-modal-title').textContent = managePending.name;
   document.getElementById('manage-modal-macros').textContent = managePending.calories + ' kcal · ' + managePending.protein + 'g protein';
-  document.getElementById('manage-modal').classList.remove('hidden');
+  showModal('manage-modal');
 }
 
-function closeManageModal() { document.getElementById('manage-modal').classList.add('hidden'); managePending = null; }
+function closeManageModal() { hideModal('manage-modal'); managePending = null; }
 
 async function confirmDeleteLibItem() {
   if (!managePending) return;
-  await sb.from('library').delete().eq('id', managePending.id).eq('user_id', currentUser.id);
-  libMeals = libMeals.filter(m => m.id !== managePending.id);
+  const target = managePending;
+  const { error } = await sb.from('library').delete().eq('id', target.id).eq('user_id', currentUser.id);
+  if (error) { reportError('Could not delete the saved meal', error); return; }
+  libMeals = libMeals.filter(m => m !== target);
   closeManageModal(); renderLibrary();
 }
 
@@ -868,11 +1045,11 @@ function openEditModal() {
   document.getElementById('edit-name').value = managePending.name;
   document.getElementById('edit-cal').value = managePending.calories;
   document.getElementById('edit-pro').value = managePending.protein;
-  document.getElementById('manage-modal').classList.add('hidden');
-  document.getElementById('edit-modal').classList.remove('hidden');
+  hideModal('manage-modal', false);
+  showModal('edit-modal');
 }
 
-function closeEditModal() { document.getElementById('edit-modal').classList.add('hidden'); managePending = null; }
+function closeEditModal() { hideModal('edit-modal'); managePending = null; }
 
 async function saveEditLibItem() {
   if (!managePending) return;
@@ -880,18 +1057,19 @@ async function saveEditLibItem() {
   const cal = +document.getElementById('edit-cal').value;
   const pro = +document.getElementById('edit-pro').value;
   if (!name) { alert('Please enter a meal name.'); return; }
-  await sb.from('library').update({ name, calories: cal, protein: pro }).eq('id', managePending.id).eq('user_id', currentUser.id);
+  const { error } = await sb.from('library').update({ name, calories: cal, protein: pro }).eq('id', managePending.id).eq('user_id', currentUser.id);
+  if (error) { reportError('Could not save changes', error); return; }
   await loadLibrary(); closeEditModal(); renderLibrary();
 }
 
 function openLibModal(id) {
-  libPending = libMeals.find(m => m.id === id);
+  libPending = findById(libMeals, id);
   if (!libPending) return;
   document.getElementById('lib-modal-title').textContent = libPending.name;
   document.getElementById('lib-modal-macros').textContent = libPending.calories + ' kcal · ' + libPending.protein + 'g protein (100%)';
   document.getElementById('pct-input').value = 100;
   updatePctDisplay();
-  document.getElementById('lib-modal').classList.remove('hidden');
+  showModal('lib-modal');
 }
 
 function updatePctDisplay() {
@@ -900,7 +1078,7 @@ function updatePctDisplay() {
   document.getElementById('lib-modal-adjusted').textContent = (libPending.calories * pct / 100).toFixed(1) + ' kcal · ' + (libPending.protein * pct / 100).toFixed(1) + 'g protein';
 }
 
-function closeLibModal() { document.getElementById('lib-modal').classList.add('hidden'); libPending = null; }
+function closeLibModal() { hideModal('lib-modal'); libPending = null; }
 
 function confirmLibLog() {
   if (!libPending) return;
@@ -964,15 +1142,65 @@ function renderHistory() {
   document.getElementById('history-body').innerHTML = summaryRow + todayRow + dataRows;
 }
 
+// ─── EVENT LISTENERS (dynamic content) ────────────────────────────────────────
+
+function initListeners() {
+  // Today: +1 / delete on meal rows
+  document.getElementById('today-summary').addEventListener('click', e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    if (btn.dataset.action === 'repeat') repeatMeal(btn.dataset.id);
+    else if (btn.dataset.action === 'delete') deleteMeal(btn.dataset.id);
+  });
+
+  // Library: log / manage
+  document.getElementById('library-list').addEventListener('click', e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    if (btn.dataset.action === 'lib-log') openLibModal(btn.dataset.id);
+    else if (btn.dataset.action === 'lib-manage') manageLibItem(btn.dataset.id);
+  });
+
+  // USDA results: click or Enter/Space to pick
+  const results = document.getElementById('usda-results');
+  const pick = target => {
+    const item = target.closest('.search-item');
+    if (!item) return;
+    const food = usdaResults[+item.dataset.idx];
+    if (food) selectUSDA(food);
+  };
+  results.addEventListener('click', e => pick(e.target));
+  results.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(e.target); }
+  });
+}
+
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 
 async function loadApp() {
-  await loadSettings();
-  await loadHistory();
-  await detectOpenDay();
-  await loadLibrary();
-  renderToday();
+  try {
+    await loadSettings();
+    await loadHistory();
+    await detectOpenDay();
+    await loadLibrary();
+    renderToday();
+  } catch (e) {
+    reportError('Something went wrong while loading', e);
+  }
 }
+
+async function init() {
+  initListeners();
+  try {
+    const { data, error } = await sb.auth.getSession();
+    if (error) throw error;
+    if (data && data.session) loginSuccess(data.session.user);
+  } catch (e) {
+    console.error('Session restore failed', e);
+  }
+}
+
+init();
 </script>
 </body>
 </html>
