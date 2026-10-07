@@ -173,6 +173,12 @@
       <div class="card">
         <div class="card-title">Saved meals</div>
         <input type="text" id="library-search" aria-label="Search saved meals" placeholder="Search saved meals..." oninput="renderLibrary()" style="margin-bottom:12px">
+        <select id="library-sort" aria-label="Sort saved meals" onchange="renderLibrary()" style="margin-bottom:12px">
+          <option value="name">Alphabetical</option>
+          <option value="protein">Highest protein</option>
+          <option value="calories">Highest calories</option>
+          <option value="ratio">Best ratio</option>
+        </select>
         <div id="library-list"><div class="text-muted">No saved meals yet.</div></div>
       </div>
     </div>
@@ -298,7 +304,7 @@
 const SUPABASE_URL = 'https://ujpffxdnvskzyojscsaa.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcGZmeGRudnNrenlvanNjc2FhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MTE0NDAsImV4cCI6MjA5NjA4NzQ0MH0.bGEOaKtiMqWW-ZufL99Uk_hJkuWlHkmx8Q-REhos_tc';
 const USDA_KEY = 'QchLTxDO9gwEsAbIEjwaXhrdqS22of1bFgrlMXoD';
-const VERSION = '0848.09.21';
+const VERSION = '0857.10.07';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const HISTORY_CAP = 50;
@@ -335,6 +341,18 @@ function esc(s) {
 // both UUID and numeric primary keys.
 function findById(list, id) {
   return list.find(x => String(x.id) === String(id));
+}
+
+// Calories per gram of protein. Lower = more protein per calorie.
+// Returns null when there's no protein (can't divide by zero).
+function ratioOf(cal, pro) {
+  const c = +cal || 0, p = +pro || 0;
+  return p > 0 ? +(c / p).toFixed(1) : null;
+}
+
+function ratioText(cal, pro) {
+  const r = ratioOf(cal, pro);
+  return r === null ? '–' : r;
 }
 
 function reportError(context, error) {
@@ -839,7 +857,7 @@ function renderToday() {
     ? '<div class="text-muted">No meals logged yet.</div>'
     : todayMeals.map(m =>
         '<div class="meal-item">' +
-          '<div><div class="meal-name">' + esc(m.name || 'Meal') + '</div><div class="meal-macros">' + esc(m.calories) + ' kcal · ' + esc(m.protein) + 'g protein</div></div>' +
+          '<div><div class="meal-name">' + esc(m.name || 'Meal') + '</div><div class="meal-macros">' + esc(m.calories) + ' kcal · ' + esc(m.protein) + 'g protein · ' + ratioText(m.calories, m.protein) + ' cal/g</div></div>' +
           '<div style="display:flex;align-items:center;gap:6px">' +
             '<button class="btn btn-secondary btn-sm" data-action="repeat" data-id="' + esc(m.id) + '" aria-label="Add another ' + esc(m.name || 'meal') + '">+1</button>' +
             '<button class="meal-del" data-action="delete" data-id="' + esc(m.id) + '" aria-label="Delete ' + esc(m.name || 'meal') + '">&#215;</button>' +
@@ -854,7 +872,7 @@ function renderToday() {
         '<div class="stat-label" style="color:' + remainingColor + '">' + remainingLabel + '</div>' +
         '<div class="stat-sub">' + totCal + ' eaten</div>' +
       '</div>' +
-      '<div class="stat-box"><div class="stat-val">' + totPro + 'g</div><div class="stat-label">protein today</div><div class="stat-sub">floor: ' + proFloorG + 'g</div></div>' +
+      '<div class="stat-box"><div class="stat-val">' + totPro + 'g</div><div class="stat-label">protein today</div><div class="stat-sub">floor: ' + proFloorG + 'g · ratio ' + ratioText(totCal, totPro) + '</div></div>' +
     '</div>' +
     '<div class="card"><div class="card-title">Progress</div>' +
       '<div class="prog-wrap"><div class="prog-label"><span>Calories</span><span>' + totCal + ' / ' + effectiveCeil + '</span></div><div class="prog-bar"><div class="prog-fill" style="width:' + calPct + '%;background:' + calColor + '"></div></div></div>' +
@@ -975,7 +993,7 @@ async function searchUSDA() {
       document.getElementById('usda-results').innerHTML = usdaResults.map((f, idx) =>
         '<div class="search-item" role="button" tabindex="0" data-idx="' + idx + '">' +
           '<div class="search-item-name">' + esc(f.name) + '</div>' +
-          '<div class="search-item-detail">' + Math.round(f.cal) + ' kcal · ' + +f.pro.toFixed(1) + 'g protein per 100g</div></div>'
+          '<div class="search-item-detail">' + Math.round(f.cal) + ' kcal · ' + +f.pro.toFixed(1) + 'g protein · ' + ratioText(f.cal, f.pro) + ' cal/g per 100g</div></div>'
       ).join('');
       return;
     } catch(e) { /* retry */ }
@@ -1015,11 +1033,27 @@ function logUSDA() {
 function renderLibrary() {
   const el = document.getElementById('library-list');
   const q = (document.getElementById('library-search') ? document.getElementById('library-search').value : '').toLowerCase();
+  const sort = document.getElementById('library-sort') ? document.getElementById('library-sort').value : 'name';
   const filtered = libMeals.filter(m => m.name.toLowerCase().includes(q));
   if (filtered.length === 0) { el.innerHTML = '<div class="text-muted">' + (libMeals.length === 0 ? 'No saved meals yet.' : 'No matches.') + '</div>'; return; }
+
+  filtered.sort((a, b) => {
+    if (sort === 'protein') return b.protein - a.protein;
+    if (sort === 'calories') return b.calories - a.calories;
+    if (sort === 'ratio') {
+      // Lowest cal/g first (most protein per calorie); zero-protein foods last.
+      const ra = ratioOf(a.calories, a.protein), rb = ratioOf(b.calories, b.protein);
+      if (ra === null && rb === null) return 0;
+      if (ra === null) return 1;
+      if (rb === null) return -1;
+      return ra - rb;
+    }
+    return a.name.localeCompare(b.name);
+  });
+
   el.innerHTML = filtered.map(m =>
     '<div class="meal-item">' +
-      '<div><div class="meal-name">' + esc(m.name) + '</div><div class="meal-macros">' + esc(m.calories) + ' kcal · ' + esc(m.protein) + 'g protein</div></div>' +
+      '<div><div class="meal-name">' + esc(m.name) + '</div><div class="meal-macros">' + esc(m.calories) + ' kcal · ' + esc(m.protein) + 'g protein · ' + ratioText(m.calories, m.protein) + ' cal/g</div></div>' +
       '<div style="display:flex;gap:6px;align-items:center">' +
         '<button class="btn btn-primary btn-sm" data-action="lib-log" data-id="' + esc(m.id) + '" aria-label="Log ' + esc(m.name) + '">Log</button>' +
         '<button class="btn btn-secondary btn-sm" data-action="lib-manage" data-id="' + esc(m.id) + '" aria-label="Manage ' + esc(m.name) + '">...</button>' +
@@ -1031,7 +1065,7 @@ function manageLibItem(id) {
   managePending = findById(libMeals, id);
   if (!managePending) return;
   document.getElementById('manage-modal-title').textContent = managePending.name;
-  document.getElementById('manage-modal-macros').textContent = managePending.calories + ' kcal · ' + managePending.protein + 'g protein';
+  document.getElementById('manage-modal-macros').textContent = managePending.calories + ' kcal · ' + managePending.protein + 'g protein · ' + ratioText(managePending.calories, managePending.protein) + ' cal/g';
   showModal('manage-modal');
 }
 
@@ -1072,7 +1106,7 @@ function openLibModal(id) {
   libPending = findById(libMeals, id);
   if (!libPending) return;
   document.getElementById('lib-modal-title').textContent = libPending.name;
-  document.getElementById('lib-modal-macros').textContent = libPending.calories + ' kcal · ' + libPending.protein + 'g protein (100%)';
+  document.getElementById('lib-modal-macros').textContent = libPending.calories + ' kcal · ' + libPending.protein + 'g protein · ' + ratioText(libPending.calories, libPending.protein) + ' cal/g (100%)';
   document.getElementById('pct-input').value = 100;
   updatePctDisplay();
   showModal('lib-modal');
