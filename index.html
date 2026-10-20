@@ -304,7 +304,7 @@
 const SUPABASE_URL = 'https://ujpffxdnvskzyojscsaa.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcGZmeGRudnNrenlvanNjc2FhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MTE0NDAsImV4cCI6MjA5NjA4NzQ0MH0.bGEOaKtiMqWW-ZufL99Uk_hJkuWlHkmx8Q-REhos_tc';
 const USDA_KEY = 'QchLTxDO9gwEsAbIEjwaXhrdqS22of1bFgrlMXoD';
-const VERSION = '0857.10.07';
+const VERSION = '1154.10.20';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const HISTORY_CAP = 50;
@@ -831,9 +831,12 @@ function renderToday() {
   const proCeilG = proTargets.ceil;
 
   const W = cfg.calWindow;
-  const pastDays = historyDays.slice(-(W - 1));
+  // Window = today (newest) + the W-1 most recent locked days. Early on, use
+  // however many days exist so the max isn't inflated.
+  const pastDays = W > 1 ? historyDays.slice(-(W - 1)) : [];
+  const windowDays = pastDays.length + 1;
   const pastCal  = pastDays.reduce((s, d) => s + (d.calories || 0), 0);
-  const budget   = (effectiveCeil * W) - pastCal;
+  const budget   = (effectiveCeil * windowDays) - pastCal;
   const remaining      = +(effectiveCeil - totCal).toFixed(1);
   const remainingToMax = +(budget - totCal).toFixed(1);
 
@@ -881,9 +884,12 @@ function renderToday() {
         '<div class="prog-fill" style="position:absolute;left:' + proBelowFloorPct + '%;top:0;width:' + proAboveFloorPct + '%;background:var(--protein-bar-above-floor)"></div>' +
       '</div></div>' +
     '</div>' +
-    '<div class="card"><div class="card-title">Today\'s Max (' + W + '-day avg)</div>' +
-      '<div style="font-size:22px;font-weight:700">' + (budget > 0 ? budget + ' kcal' : 'Over') + '</div>' +
-      '<div class="text-muted mt" style="font-size:12px">Keeps ' + W + '-day average at ' + effectiveCeil.toLocaleString() + ' kcal</div>' +
+    '<div class="card"><div class="card-title">Today\'s Max (' + windowDays + '-day avg)</div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
+        '<div><div style="font-size:22px;font-weight:700">' + (budget > 0 ? budget + ' kcal' : 'Over') + '</div><div class="stat-sub">max for today</div></div>' +
+        '<div style="text-align:right"><div style="font-size:22px;font-weight:700;color:' + (remainingToMax >= 0 ? 'var(--accent)' : 'var(--red)') + '">' + Math.abs(remainingToMax) + '</div><div class="stat-sub" style="color:' + (remainingToMax >= 0 ? 'var(--accent)' : 'var(--red)') + '">' + (remainingToMax >= 0 ? 'kcal left' : 'kcal over') + '</div></div>' +
+      '</div>' +
+      '<div class="text-muted mt" style="font-size:12px">Keeps ' + windowDays + '-day average at ' + effectiveCeil.toLocaleString() + ' kcal</div>' +
     '</div>' +
     '<div class="card"><div class="card-title">Today\'s Meals <span class="dot-open"></span></div>' + mealsHTML + '</div>' +
     '<button class="btn btn-secondary mt" onclick="showScreen(\'log\')">+ Log a meal</button>';
