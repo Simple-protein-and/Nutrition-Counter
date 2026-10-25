@@ -304,7 +304,7 @@
 const SUPABASE_URL = 'https://ujpffxdnvskzyojscsaa.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcGZmeGRudnNrenlvanNjc2FhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MTE0NDAsImV4cCI6MjA5NjA4NzQ0MH0.bGEOaKtiMqWW-ZufL99Uk_hJkuWlHkmx8Q-REhos_tc';
 const USDA_KEY = 'QchLTxDO9gwEsAbIEjwaXhrdqS22of1bFgrlMXoD';
-const VERSION = '1154.10.20';
+const VERSION = '0000.10.25';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const HISTORY_CAP = 50;
@@ -856,6 +856,38 @@ function renderToday() {
   const remainingLabel   = remaining > 0 ? 'kcal remaining' : remainingToMax > 0 ? 'kcal until daily max' : 'kcal over daily max';
   const remainingDisplay = remaining > 0 ? remaining : remainingToMax > 0 ? remainingToMax : Math.abs(remainingToMax);
 
+  // Max card, right side. While under the target-based max: "kcal left".
+  // Once past it: count down to the maintenance max (the TDEE average held over
+  // the same window) instead of just showing how far over. If there's no TDEE
+  // yet, fall back to the plain "kcal over".
+  const tdeeAvgNow = tdeeNow > 0 ? calcTDEEAvg(tdeeNow) : 0;
+  const remainingToMaint = tdeeAvgNow > 0
+    ? +((tdeeAvgNow * windowDays) - pastCal - totCal).toFixed(1)
+    : null;
+
+  let maxDisplay, maxLabel, maxColor, maxFooter;
+  if (remainingToMax >= 0) {
+    maxDisplay = remainingToMax;
+    maxLabel = 'kcal left';
+    maxColor = 'var(--accent)';
+    maxFooter = 'Keeps ' + windowDays + '-day average at ' + effectiveCeil.toLocaleString() + ' kcal';
+  } else if (remainingToMaint === null) {
+    maxDisplay = Math.abs(remainingToMax);
+    maxLabel = 'kcal over';
+    maxColor = 'var(--red)';
+    maxFooter = 'Keeps ' + windowDays + '-day average at ' + effectiveCeil.toLocaleString() + ' kcal';
+  } else if (remainingToMaint >= 0) {
+    maxDisplay = remainingToMaint;
+    maxLabel = 'kcal left until avg hits maintenance';
+    maxColor = 'var(--yellow)';
+    maxFooter = 'Past your target max. Keeps ' + windowDays + '-day average at maintenance (' + tdeeAvgNow.toLocaleString() + ' kcal)';
+  } else {
+    maxDisplay = Math.abs(remainingToMaint);
+    maxLabel = 'kcal over maintenance';
+    maxColor = 'var(--red)';
+    maxFooter = 'Over maintenance (' + tdeeAvgNow.toLocaleString() + ' kcal ' + windowDays + '-day average)';
+  }
+
   const mealsHTML = todayMeals.length === 0
     ? '<div class="text-muted">No meals logged yet.</div>'
     : todayMeals.map(m =>
@@ -887,9 +919,9 @@ function renderToday() {
     '<div class="card"><div class="card-title">Today\'s Max (' + windowDays + '-day avg)</div>' +
       '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
         '<div><div style="font-size:22px;font-weight:700">' + (budget > 0 ? budget + ' kcal' : 'Over') + '</div><div class="stat-sub">max for today</div></div>' +
-        '<div style="text-align:right"><div style="font-size:22px;font-weight:700;color:' + (remainingToMax >= 0 ? 'var(--accent)' : 'var(--red)') + '">' + Math.abs(remainingToMax) + '</div><div class="stat-sub" style="color:' + (remainingToMax >= 0 ? 'var(--accent)' : 'var(--red)') + '">' + (remainingToMax >= 0 ? 'kcal left' : 'kcal over') + '</div></div>' +
+        '<div style="text-align:right"><div style="font-size:22px;font-weight:700;color:' + maxColor + '">' + maxDisplay + '</div><div class="stat-sub" style="color:' + maxColor + '">' + maxLabel + '</div></div>' +
       '</div>' +
-      '<div class="text-muted mt" style="font-size:12px">Keeps ' + windowDays + '-day average at ' + effectiveCeil.toLocaleString() + ' kcal</div>' +
+      '<div class="text-muted mt" style="font-size:12px">' + maxFooter + '</div>' +
     '</div>' +
     '<div class="card"><div class="card-title">Today\'s Meals <span class="dot-open"></span></div>' + mealsHTML + '</div>' +
     '<button class="btn btn-secondary mt" onclick="showScreen(\'log\')">+ Log a meal</button>';
